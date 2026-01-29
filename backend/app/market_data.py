@@ -136,3 +136,68 @@ def fetch_chart(symbol: str, range_value: str) -> dict:
     response.raise_for_status()
     payload = response.json()
     return {"symbol": symbol.upper(), "points": payload.get("points", [])}
+
+
+def fetch_basic_financials(symbol: str, metric: str) -> dict:
+    if os.environ.get("MARKET_DATA_MOCK", "true").lower() == "true":
+        return {
+            "symbol": symbol.upper(),
+            "metricType": metric,
+            "metric": {},
+            "series": {},
+        }
+
+    base_url, api_key, provider = _get_market_data_config()
+    if provider == "finnhub":
+        response = requests.get(
+            f"{base_url}/stock/metric",
+            params={"symbol": symbol, "metric": metric, "token": api_key},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    response = requests.get(
+        f"{base_url}/stock/metric",
+        params={"symbol": symbol, "metric": metric, "apikey": api_key},
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.json()
+
+def fetch_forex_symbols(exchange: str) -> list:
+    if os.environ.get("MARKET_DATA_MOCK", "true").lower() == "true":
+        return [
+            {
+                "description": "IC MARKETS Euro vs US Dollar EURUSD",
+                "displaySymbol": "EUR/USD",
+                "symbol": "IC MARKETS:1"
+            },
+            {
+                "description": "IC MARKETS Australian vs US Dollar AUDUSD",
+                "displaySymbol": "AUD/USD",
+                "symbol": "IC MARKETS:5"
+            },
+            {
+                "description": "IC MARKETS British Pound vs US Dollar GBPUSD",
+                "displaySymbol": "GBP/USD",
+                "symbol": "IC MARKETS:2"
+            }]
+
+    base_url, api_key, provider = _get_market_data_config();
+    if provider == "finnhub":
+        response = requests.get(
+            f"{base_url}/forex/symbol",
+            params={"exchange": exchange, "token": api_key},
+            timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+
+    response = requests.get(
+        f"{base_url}/forex/symbol",
+        params={"exchange": exchange, "api_key": api_key},
+        timeout=10
+    )
+    response.raise_for_status()
+    return response.json()

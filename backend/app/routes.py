@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
 from .extensions import bcrypt, db
-from .market_data import fetch_chart, fetch_quote
+from .market_data import fetch_basic_financials, fetch_chart, fetch_forex_symbols, fetch_quote
 from .models import Account, Order, Position, User
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -118,6 +118,22 @@ def chart():
     if not symbol:
         return jsonify({"error": "Symbol required"}), 400
     return jsonify(fetch_chart(symbol, range_value))
+
+
+@api.get("/stock/metric")
+def stock_metric():
+    symbol = request.args.get("symbol", "").upper()
+    metric = request.args.get("metric", "all")
+    if not symbol:
+        return jsonify({"error": "Symbol required"}), 400
+    return jsonify(fetch_basic_financials(symbol, metric))
+
+@api.get("/forex/symbol")
+def forex_symbol():
+    exchange = request.args.get("exchange", "").lower()
+    if not exchange:
+        return jsonify({"error": "Exchange required"}), 400
+    return jsonify(fetch_forex_symbols(exchange))
 
 
 @api.post("/orders")
