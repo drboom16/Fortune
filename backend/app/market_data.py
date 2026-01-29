@@ -69,12 +69,16 @@ def fetch_quote(symbol: str) -> dict:
         )
         response.raise_for_status()
         payload = response.json()
+        price_value = payload.get("c") or 0
+        previous_close_value = payload.get("pc") or price_value
+        change_value = payload.get("d") or 0
+        change_percent_value = payload.get("dp") or 0
         return {
             "symbol": symbol.upper(),
-            "price": float(payload["c"]),
-            "previous_close": float(payload.get("pc", payload["c"])),
-            "change": float(payload.get("d", 0)),
-            "change_percent": float(payload.get("dp", 0)),
+            "price": float(price_value),
+            "previous_close": float(previous_close_value),
+            "change": float(change_value),
+            "change_percent": float(change_percent_value),
         }
 
     response = requests.get(
