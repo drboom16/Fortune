@@ -29,7 +29,6 @@ Update `backend/.env` if you want to change the DB name/user/password.
 ```bash
 cd frontend
 npm install
-cp .env.example .env
 npm run dev
 ```
 
@@ -39,4 +38,4 @@ The frontend runs at `http://localhost:3000` and reads `VITE_API_BASE_URL` from 
 
 - Auth is JWT-based. After login, the token is stored in local storage.
 - Market data uses a mock by default (`MARKET_DATA_MOCK=true`). To enable Finnhub, set `MARKET_DATA_PROVIDER=finnhub`, `MARKET_DATA_BASE_URL=https://finnhub.io/api/v1`, `MARKET_DATA_API_KEY=...`, and `MARKET_DATA_MOCK=false` in `backend/.env`.
-- SQLite is the default for local dev. Update `DATABASE_URL` and market data values for real integrations.
+- `DATABASE_URL` links up with postgreSQL.
