@@ -14,6 +14,16 @@ python3 run.py
 
 The API runs at `http://localhost:5000/api`.
 
+## Database setup (PostgreSQL via Docker)
+
+```bash
+cd ..
+docker compose up -d
+```
+
+This starts Postgres on `localhost:5432` with credentials from `docker-compose.yml`.
+Update `backend/.env` if you want to change the DB name/user/password.
+
 ## Frontend setup (Vite + React)
 
 ```bash
