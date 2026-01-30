@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fortune-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fortune
+      POSTGRES_USER: fortune_user
+      POSTGRES_PASSWORD: fortune_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - fortune_db:/var/lib/postgresql/data
+
+volumes:
+  fortune_db:
