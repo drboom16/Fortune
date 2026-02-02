@@ -9,7 +9,14 @@ from flask_jwt_extended import (
 )
 
 from .extensions import bcrypt, db
-from .market_data import fetch_basic_financials, fetch_chart, fetch_forex_symbols, fetch_quote
+from .market_data import (
+    fetch_basic_financials,
+    fetch_chart,
+    fetch_company_snapshot,
+    fetch_forex_symbols,
+    fetch_quote,
+    fetch_watchlist,
+)
 from .models import Account, Order, Position, User
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -99,6 +106,22 @@ def refresh():
     access_token = create_access_token(identity=user_id)
     return jsonify({"access_token": access_token})
 
+
+@api.get("/market/watchlist")
+def market_watchlist():
+    try:
+        items = fetch_watchlist(limit=20)
+        return jsonify({"items": items})
+    except Exception as exc:  # pragma: no cover - surface upstream error
+        return jsonify({"error": str(exc)}), 500
+
+@api.get("/market/<symbol>")
+def market_symbol(symbol):
+    try:
+        snapshot = fetch_company_snapshot(symbol)
+        return jsonify({"data": snapshot})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 @api.get("/account")
 @jwt_required()
