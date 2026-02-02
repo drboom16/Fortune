@@ -3,6 +3,7 @@ import { ChevronDown, Search } from "lucide-react";
 
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { useNavigate } from "react-router-dom";
 
 type AiWatchlistItem = {
   ticker: string;
@@ -20,6 +21,16 @@ export default function Watchlist() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const navigate = useNavigate();
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalised = query.trim();
+    if (!normalised) {
+      return;
+    }  
+    navigate(`/market/${normalised.toLowerCase()}`);
+  }
 
   const loadWatchlist = async () => {
     setLoading(true);
@@ -124,12 +135,14 @@ export default function Watchlist() {
           <div className="flex flex-1 items-center justify-center py-1">
             <div className="relative w-full max-w-lg">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              className="h-12 w-full rounded-full border border-border bg-card px-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
+              <form onSubmit={handleSubmit}>
+                <input
+                className="h-12 w-full rounded-full border border-border bg-card px-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </form>
             </div>
           </div>
         </div>
