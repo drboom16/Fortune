@@ -181,29 +181,35 @@ def fetch_forex_symbols(exchange: str) -> list:
     raise ValueError("Forex symbols are not supported without market data providers.")
 
 
-def fetch_watchlist(limit: int = 20) -> list[dict]:
-    symbols = [
-        "AAPL",
-        "MSFT",
-        "NVDA",
-        "AMZN",
-        "GOOGL",
-        "META",
-        "BRK-B",
-        "LLY",
-        "AVGO",
-        "JPM",
-        "UNH",
-        "XOM",
-        "V",
-        "MA",
-        "COST",
-        "WMT",
-        "PG",
-        "JNJ",
-        "ORCL",
-        "HD",
-    ][:limit]
+DEFAULT_WATCHLIST_SYMBOLS = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "BRK-B",
+    "LLY",
+    "AVGO",
+    "JPM",
+    "UNH",
+    "XOM",
+    "V",
+    "MA",
+    "COST",
+    "WMT",
+    "PG",
+    "JNJ",
+    "ORCL",
+    "HD",
+]
+
+
+def fetch_watchlist(limit: int = 20, symbols: Optional[list[str]] = None) -> list[dict]:
+    if symbols is None:
+        symbols = DEFAULT_WATCHLIST_SYMBOLS[:limit]
+    else:
+        symbols = [_normalize_symbol(symbol) for symbol in symbols if symbol]
     items = []
     for symbol in symbols:
         normalized_symbol = _normalize_symbol(symbol)

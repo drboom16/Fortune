@@ -17,9 +17,12 @@ from .market_data import (
     fetch_quote,
     fetch_watchlist,
 )
-from .models import Account, Order, Position, User
+from .models import Account, Order, Position, User, WatchlistItem
 
 api = Blueprint("api", __name__, url_prefix="/api")
+
+def _normalize_watchlist_symbol(symbol: str) -> str:
+    return symbol.strip().upper()
 
 
 def _get_account_for_user(user_id: int) -> Account:
@@ -69,8 +72,8 @@ def register():
     db.session.add(account)
     db.session.commit()
 
-    access_token = create_access_token(identity=user.id)
-    refresh_token = create_refresh_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
     return (
         jsonify(
             {
@@ -92,8 +95,8 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity=user.id)
-    refresh_token = create_refresh_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
     return jsonify(
         {"access_token": access_token, "refresh_token": refresh_token, "user": user.to_dict()}
     )
@@ -102,18 +105,52 @@ def login():
 @api.post("/auth/refresh")
 @jwt_required(refresh=True)
 def refresh():
-    user_id = get_jwt_identity()
-    access_token = create_access_token(identity=user_id)
+    user_id = int(get_jwt_identity())
+    access_token = create_access_token(identity=str(user_id))
     return jsonify({"access_token": access_token})
 
 
 @api.get("/market/watchlist")
+@jwt_required()
 def market_watchlist():
     try:
-        items = fetch_watchlist(limit=20)
+        user_id = int(get_jwt_identity())
+        symbols = [item.symbol for item in WatchlistItem.query.filter_by(user_id=user_id).all()]
+        items = fetch_watchlist(symbols=symbols) if symbols else []
         return jsonify({"items": items})
     except Exception as exc:  # pragma: no cover - surface upstream error
         return jsonify({"error": str(exc)}), 500
+
+
+@api.post("/market/watchlist")
+@jwt_required()
+def add_watchlist():
+    payload = request.get_json() or {}
+    symbol = _normalize_watchlist_symbol(payload.get("symbol", ""))
+    if not symbol:
+        return jsonify({"error": "Symbol required"}), 400
+    user_id = int(get_jwt_identity())
+    existing = WatchlistItem.query.filter_by(user_id=user_id, symbol=symbol).first()
+    if not existing:
+        db.session.add(WatchlistItem(user_id=user_id, symbol=symbol))
+        db.session.commit()
+    symbols = [item.symbol for item in WatchlistItem.query.filter_by(user_id=user_id).all()]
+    items = fetch_watchlist(symbols=symbols) if symbols else []
+    return jsonify({"items": items})
+
+
+@api.delete("/market/watchlist/<symbol>")
+@jwt_required()
+def remove_watchlist(symbol):
+    normalized = _normalize_watchlist_symbol(symbol)
+    if not normalized:
+        return jsonify({"error": "Symbol required"}), 400
+    user_id = int(get_jwt_identity())
+    WatchlistItem.query.filter_by(user_id=user_id, symbol=normalized).delete()
+    db.session.commit()
+    symbols = [item.symbol for item in WatchlistItem.query.filter_by(user_id=user_id).all()]
+    items = fetch_watchlist(symbols=symbols) if symbols else []
+    return jsonify({"items": items})
 
 @api.get("/market/<symbol>")
 def market_symbol(symbol):
@@ -126,7 +163,7 @@ def market_symbol(symbol):
 @api.get("/account")
 @jwt_required()
 def account():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
     return jsonify({"account": _account_summary(account)})
 
@@ -134,7 +171,7 @@ def account():
 @api.get("/portfolio")
 @jwt_required()
 def portfolio():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
     positions_payload = []
     for position in account.positions.all():
@@ -197,7 +234,7 @@ def create_order():
     if not symbol or side not in {"BUY", "SELL"} or quantity <= 0:
         return jsonify({"error": "Invalid order payload"}), 400
 
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
     quote = fetch_quote(symbol)
     price = Decimal(str(quote["price"]))
@@ -246,7 +283,7 @@ def create_order():
 @api.get("/orders")
 @jwt_required()
 def orders():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
     orders_payload = [order.to_dict() for order in account.orders.order_by(Order.id.desc())]
     return jsonify({"orders": orders_payload})
