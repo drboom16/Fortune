@@ -29,7 +29,6 @@ Update `backend/.env` if you want to change the DB name/user/password.
 ```bash
 cd frontend
 npm install
-cp .env.example .env
 npm run dev
 ```
 
