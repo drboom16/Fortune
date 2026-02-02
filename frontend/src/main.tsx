@@ -8,6 +8,7 @@ import Portfolio from "./pages/Portfolio";
 import Watchlist from "./pages/Watchlist";
 import "./index.css";
 import Home from "./pages/Home";
+import MarketStock from "./pages/MarketStock";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="login" element={<Auth />} />
         <Route element={<App />}>
           <Route path="home" element={<Home />} />
+          <Route path="market/:symbol" element={<MarketStock />} />
           <Route path="watchlist" element={<Watchlist />} />
           <Route path="portfolio" element={<Portfolio />} />
         </Route>

@@ -1,114 +1,84 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 
-import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 
-type Quote = {
-  symbol: string;
-  price: number;
-  previous_close: number;
-  change: number;
-  change_percent: number;
+type AiWatchlistItem = {
+  ticker: string;
+  company_name: string;
+  value: number;
+  change_1d: number;
+  "52w_range": [number, number];
 };
-
-type Company = {
-  symbol: string;
-  name: string;
-  sector: string;
-};
-
-const companies: Company[] = [
-  { symbol: "AAPL", name: "Apple", sector: "Technology" },
-  { symbol: "MSFT", name: "Microsoft", sector: "Technology" },
-  { symbol: "AMZN", name: "Amazon", sector: "Consumer Discretionary" },
-  { symbol: "NVDA", name: "NVIDIA", sector: "Technology" },
-  { symbol: "GOOGL", name: "Alphabet", sector: "Communication Services" },
-  { symbol: "META", name: "Meta Platforms", sector: "Communication Services" },
-  { symbol: "JPM", name: "JPMorgan Chase", sector: "Financials" },
-  { symbol: "V", name: "Visa", sector: "Financials" },
-  { symbol: "UNH", name: "UnitedHealth", sector: "Health Care" },
-  { symbol: "XOM", name: "Exxon Mobil", sector: "Energy" }
-];
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export default function Watchlist() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [items, setItems] = useState<AiWatchlistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const companyMap = useMemo(() => {
-    return new Map(companies.map((company) => [company.symbol, company]));
-  }, []);
-
-  const loadQuotes = async () => {
+  const loadWatchlist = async () => {
     setLoading(true);
     setError(null);
     try {
-      const results = await Promise.allSettled(
-        companies.map(async (company) => {
-          const response = await fetch(`${API_BASE_URL}/quote?symbol=${company.symbol}`);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch ${company.symbol}`);
-          }
-          return (await response.json()) as Quote;
-        })
-      );
-
-      const nextQuotes = results
-        .filter((result): result is PromiseFulfilledResult<Quote> => result.status === "fulfilled")
-        .map((result) => result.value);
-
-      if (!nextQuotes.length) {
-        throw new Error("No quotes returned from API.");
+      const response = await fetch(`${API_BASE_URL}/market/watchlist`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch watchlist.");
       }
-      setQuotes(nextQuotes);
+      const payload = (await response.json()) as { items?: AiWatchlistItem[] };
+      const nextItems = Array.isArray(payload.items) ? payload.items : [];
+      if (!nextItems.length) {
+        throw new Error("No watchlist items returned.");
+      }
+      setItems(nextItems);
       setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load market data.");
+      setError(err instanceof Error ? err.message : "Unable to load watchlist.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadQuotes();
+    void loadWatchlist();
   }, []);
 
-  const filteredQuotes = useMemo(() => {
+  const filteredItems = useMemo(() => {
     const normalized = query.trim().toUpperCase();
     if (!normalized) {
-      return quotes;
+      return items;
     }
-    return quotes.filter((quote) => {
-      const company = companyMap.get(quote.symbol);
+    return items.filter((item) => {
       return (
-        quote.symbol.includes(normalized) ||
-        company?.name.toUpperCase().includes(normalized) ||
-        company?.sector.toUpperCase().includes(normalized)
+        item.ticker.toUpperCase().includes(normalized) ||
+        item.company_name.toUpperCase().includes(normalized)
       );
     });
-  }, [quotes, query, companyMap]);
+  }, [items, query]);
 
   const watchlistItems = useMemo(() => {
-    return filteredQuotes.map((quote) => {
-      const company = companyMap.get(quote.symbol);
-      const spread = Math.max(0.05, quote.price * 0.0008);
-      const buy = quote.price + spread;
-      const short = quote.price - spread;
-      const rangeLow = Math.max(0.01, quote.price * 0.78);
-      const rangeHigh = quote.price * 1.22;
+    return filteredItems.map((item) => {
+      const value = Number(item.value) || 0;
+      const change1d = Number(item.change_1d) || 0;
+      const rangeLowValue = Number(item["52w_range"]?.[0]);
+      const rangeHighValue = Number(item["52w_range"]?.[1]);
+      const spread = Math.max(0.05, value * 0.0008);
+      const buy = value + spread;
+      const short = value - spread;
+      const rangeLow = Number.isFinite(rangeLowValue) ? rangeLowValue : Math.max(0.01, value * 0.78);
+      const rangeHigh = Number.isFinite(rangeHighValue) ? rangeHighValue : value * 1.22;
       const rangePosition = Math.min(
         100,
-        Math.max(0, ((quote.price - rangeLow) / (rangeHigh - rangeLow)) * 100)
+        Math.max(0, ((value - rangeLow) / (rangeHigh - rangeLow)) * 100)
       );
       return {
-        ...quote,
-        company,
+        ...item,
+        value,
+        change_1d: change1d,
         buy,
         short,
         rangeLow,
@@ -116,7 +86,7 @@ export default function Watchlist() {
         rangePosition
       };
     });
-  }, [filteredQuotes, companyMap]);
+  }, [filteredItems]);
 
   const renderSparkline = (symbol: string, positive: boolean) => {
     const points = Array.from({ length: 14 }).map((_, index) => {
@@ -194,13 +164,16 @@ export default function Watchlist() {
             </TableHeader>
             <TableBody>
               {watchlistItems.map((quote) => {
-                const positive = quote.change >= 0;
+                const positive = quote.change_1d >= 0;
+                const changePercent = quote.value
+                  ? (quote.change_1d / quote.value) * 100
+                  : 0;
                 return (
-                  <TableRow key={quote.symbol}>
+                  <TableRow key={quote.ticker}>
                     <TableCell>
-                      <div className="font-semibold">{quote.symbol}</div>
+                      <div className="font-semibold">{quote.ticker}</div>
                       <div className="text-xs text-muted-foreground">
-                        {quote.company?.name ?? quote.symbol}
+                        {quote.company_name}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -210,14 +183,14 @@ export default function Watchlist() {
                         }`}
                       >
                         {positive ? "+" : ""}
-                        {quote.change.toFixed(2)}
+                        {quote.change_1d.toFixed(2)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {positive ? "+" : ""}
-                        {quote.change_percent.toFixed(2)}%
+                        {changePercent.toFixed(2)}%
                       </div>
                     </TableCell>
-                    <TableCell>{renderSparkline(quote.symbol, positive)}</TableCell>
+                    <TableCell>{renderSparkline(quote.ticker, positive)}</TableCell>
                     <TableCell>
                       <div className="rounded-full bg-muted px-4 py-2 text-sm font-semibold">
                         {quote.short.toFixed(2)}

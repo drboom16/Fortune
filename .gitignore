@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 .venv/
+.venv-311/
 venv/
 __pycache__/
 *.py[cod]
