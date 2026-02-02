@@ -12,6 +12,9 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     account = db.relationship("Account", back_populates="user", uselist=False)
+    watchlist_items = db.relationship(
+        "WatchlistItem", back_populates="user", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     def to_dict(self):
         return {"id": self.id, "email": self.email}
@@ -74,3 +77,15 @@ class Order(db.Model):
             "status": self.status,
             "created_at": self.created_at.isoformat() + "Z",
         }
+
+
+class WatchlistItem(db.Model):
+    __tablename__ = "watchlist_items"
+    __table_args__ = (db.UniqueConstraint("user_id", "symbol", name="uq_watchlist_user_symbol"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    symbol = db.Column(db.String(16), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="watchlist_items")

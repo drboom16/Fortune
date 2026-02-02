@@ -14,6 +14,33 @@ type AiWatchlistItem = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const getAccessToken = () => {
+  const token = localStorage.getItem("access_token");
+  if (!token || token === "null" || token === "undefined") {
+    return null;
+  }
+  return token;
+};
+
+const refreshAccessToken = async () => {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken || refreshToken === "null" || refreshToken === "undefined") {
+    return null;
+  }
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${refreshToken}` }
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const payload = (await response.json()) as { access_token?: string };
+  if (payload.access_token) {
+    localStorage.setItem("access_token", payload.access_token);
+    return payload.access_token;
+  }
+  return null;
+};
 
 export default function Watchlist() {
   const [items, setItems] = useState<AiWatchlistItem[]>([]);
@@ -36,15 +63,31 @@ export default function Watchlist() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/market/watchlist`);
+      const token = getAccessToken();
+      if (!token) {
+        setItems([]);
+        setLastUpdated(new Date());
+        return;
+      }
+      let response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.status === 401 || response.status === 422) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          setItems([]);
+          setError("Please log in to view your watchlist.");
+          return;
+        }
+        response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+          headers: { Authorization: `Bearer ${refreshed}` }
+        });
+      }
       if (!response.ok) {
         throw new Error("Failed to fetch watchlist.");
       }
       const payload = (await response.json()) as { items?: AiWatchlistItem[] };
       const nextItems = Array.isArray(payload.items) ? payload.items : [];
-      if (!nextItems.length) {
-        throw new Error("No watchlist items returned.");
-      }
       setItems(nextItems);
       setLastUpdated(new Date());
     } catch (err) {
@@ -165,7 +208,7 @@ export default function Watchlist() {
               <Skeleton key={index} className="h-14 w-full" />
             ))}
           </div>
-        ) : (
+        ) : watchlistItems.length ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -232,6 +275,10 @@ export default function Watchlist() {
               })}
             </TableBody>
           </Table>
+        ) : (
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No watchlist items yet.
+          </div>
         )}
         {error ? <div className="px-2 py-4 text-sm text-rose-500">Unable to load watchlist.</div> : null}
       </section>

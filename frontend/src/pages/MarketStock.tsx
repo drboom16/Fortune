@@ -69,6 +69,33 @@ type AiCompanyPayload = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const getAccessToken = () => {
+  const token = localStorage.getItem("access_token");
+  if (!token || token === "null" || token === "undefined") {
+    return null;
+  }
+  return token;
+};
+
+const refreshAccessToken = async () => {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken || refreshToken === "null" || refreshToken === "undefined") {
+    return null;
+  }
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${refreshToken}` }
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const payload = (await response.json()) as { access_token?: string };
+  if (payload.access_token) {
+    localStorage.setItem("access_token", payload.access_token);
+    return payload.access_token;
+  }
+  return null;
+};
 
 const metricLabels: Array<{ key: keyof NonNullable<AiCompanyPayload["performance_metrics"]>; label: string }> = [
   { key: "past_week_growth", label: "Past Week Growth" },
@@ -148,6 +175,10 @@ const MOCK_AAPL: AiCompanyPayload = {
   ]
 };
 
+type WatchlistItem = {
+  ticker?: string;
+};
+
 export default function MarketStock() {
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
@@ -155,6 +186,8 @@ export default function MarketStock() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const [watchlistBusy, setWatchlistBusy] = useState(false);
 
   const normalizedSymbol = (symbol ?? "").trim().toUpperCase();
 
@@ -190,6 +223,113 @@ export default function MarketStock() {
     };
     void load();
   }, [normalizedSymbol]);
+
+  useEffect(() => {
+    if (!normalizedSymbol) {
+      setIsInWatchlist(false);
+      return;
+    }
+    const loadStatus = async () => {
+      try {
+        const token = getAccessToken();
+        if (!token) {
+          setIsInWatchlist(false);
+          return;
+        }
+        let response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.status === 401 || response.status === 422) {
+          const refreshed = await refreshAccessToken();
+          if (!refreshed) {
+            setIsInWatchlist(false);
+            return;
+          }
+          response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+            headers: { Authorization: `Bearer ${refreshed}` }
+          });
+        }
+        if (!response.ok) {
+          throw new Error("Failed to load watchlist.");
+        }
+        const payload = (await response.json()) as { items?: WatchlistItem[] };
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const inWatchlist = items.some(
+          (item) => (item.ticker ?? "").toUpperCase() === normalizedSymbol
+        );
+        setIsInWatchlist(inWatchlist);
+      } catch {
+        setIsInWatchlist(false);
+      }
+    };
+    void loadStatus();
+  }, [normalizedSymbol]);
+
+  const handleWatchlistToggle = async () => {
+    if (!normalizedSymbol || watchlistBusy) {
+      return;
+    }
+    let token = getAccessToken();
+    if (!token) {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        setError("Please log in to manage your watchlist.");
+        return;
+      }
+      token = refreshed;
+    }
+    setWatchlistBusy(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
+        {
+          method: isInWatchlist ? "DELETE" : "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(isInWatchlist ? {} : { "Content-Type": "application/json" })
+          },
+          body: isInWatchlist ? undefined : JSON.stringify({ symbol: normalizedSymbol })
+        }
+      );
+      if (response.status === 401 || response.status === 422) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          setError("Please log in to manage your watchlist.");
+          return;
+        }
+        const retryResponse = await fetch(
+          `${API_BASE_URL}/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
+          {
+            method: isInWatchlist ? "DELETE" : "POST",
+            headers: {
+              Authorization: `Bearer ${refreshed}`,
+              ...(isInWatchlist ? {} : { "Content-Type": "application/json" })
+            },
+            body: isInWatchlist ? undefined : JSON.stringify({ symbol: normalizedSymbol })
+          }
+        );
+        if (!retryResponse.ok) {
+          throw new Error("Failed to update watchlist.");
+        }
+        const retryPayload = (await retryResponse.json()) as { items?: WatchlistItem[] };
+        const retryItems = Array.isArray(retryPayload.items) ? retryPayload.items : [];
+        setIsInWatchlist(
+          retryItems.some((item) => (item.ticker ?? "").toUpperCase() === normalizedSymbol)
+        );
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("Failed to update watchlist.");
+      }
+      const payload = (await response.json()) as { items?: WatchlistItem[] };
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      setIsInWatchlist(
+        items.some((item) => (item.ticker ?? "").toUpperCase() === normalizedSymbol)
+      );
+    } finally {
+      setWatchlistBusy(false);
+    }
+  };
 
   const metrics = useMemo(() => {
     const performance = data?.performance_metrics ?? {};
@@ -263,8 +403,12 @@ export default function MarketStock() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="rounded-full border border-border px-4 py-2 text-sm font-semibold">
-              Add to Watchlist
+            <button
+              className="rounded-full border border-border px-4 py-2 text-sm font-semibold"
+              disabled={watchlistBusy || !normalizedSymbol}
+              onClick={handleWatchlistToggle}
+            >
+              {isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
             </button>
             <button className="rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background">
               Trade
