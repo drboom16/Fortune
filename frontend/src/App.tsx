@@ -10,20 +10,24 @@ const navPad = (open: boolean) => (open ? "px-5" : "justify-center px-0");
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const sidebarWidth = sidebarOpen ? "20rem" : "6rem";
 
   useEffect(() => {
     setUserEmail(localStorage.getItem("user_email"));
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex min-h-screen">
+    <div
+      className="h-screen bg-background overflow-hidden"
+      style={{ "--sidebar-width": sidebarWidth } as React.CSSProperties}
+    >
+      <div className="h-full">
         <aside
-          className={`shrink-0 border-r border-border bg-card py-10 transition-all duration-300 ${
+          className={`fixed inset-y-0 left-0 shrink-0 border-r border-border bg-card pb-8 pt-0 transition-all duration-300 ${
             sidebarOpen ? "w-80 px-8" : "w-24 px-5"
           }`}
         >
-          <div className="mb-10 flex flex-col gap-4">
+          <div className="mb-10 flex flex-col gap-4 pt-5">
             <div className="flex items-center justify-between">
               {sidebarOpen ? (
                 <p className="text-lg uppercase tracking-[0.45em] text-muted-foreground">
@@ -79,7 +83,10 @@ export default function App() {
           </nav>
         </aside>
 
-        <div className="flex-1 px-8 py-8">
+        <div
+          className="h-full overflow-y-auto px-8 py-8"
+          style={{ marginLeft: sidebarWidth, transition: "margin-left 300ms ease" }}
+        >
           <Outlet />
         </div>
       </div>
