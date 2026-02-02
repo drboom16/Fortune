@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -8,13 +8,11 @@ from flask_jwt_extended import (
     jwt_required,
 )
 
-from .ai import extract_json, query_gemini, query_openrouter_json
 from .extensions import bcrypt, db
 from .market_data import (
     fetch_basic_financials,
     fetch_chart,
     fetch_company_snapshot,
-    fetch_company_profile,
     fetch_forex_symbols,
     fetch_quote,
     fetch_watchlist,
@@ -108,110 +106,6 @@ def refresh():
     access_token = create_access_token(identity=user_id)
     return jsonify({"access_token": access_token})
 
-
-@api.post("/ai/query")
-def ai_query():
-    payload = request.get_json() or {}
-    prompt = payload.get("prompt", "").strip()
-    model = payload.get("model")
-    grounding = bool(payload.get("grounding", False))
-    if not prompt:
-        return jsonify({"error": "Prompt required"}), 400
-    try:
-        result = query_gemini(prompt, model=model, grounding=grounding)
-        return jsonify({"response": result["text"]})
-    except Exception as exc:  # pragma: no cover - surface upstream error
-        return jsonify({"error": str(exc)}), 500
-
-
-@api.get("/ai/company")
-def ai_company():
-    symbol = request.args.get("symbol", "").strip().upper()
-    if not symbol:
-        return jsonify({"error": "Symbol required"}), 400
-    schema_example = (
-        "{\n"
-        '  "ticker": "NVDA",\n'
-        '  "company_name": "NVIDIA Corporation",\n'
-        '  "market_status": "Market Closed",\n'
-        '  "quote": {\n'
-        '    "current_price": 191.13,\n'
-        '    "currency": "USD",\n'
-        '    "change_absolute": -1.38,\n'
-        '    "change_percentage": -0.72,\n'
-        '    "trading_mode": "24/5 Trading"\n'
-        "  },\n"
-        '  "performance_metrics": {\n'
-        '    "past_week_growth": "+3.88%",\n'
-        '    "market_cap": "4.64T",\n'
-        '    "volume_3m_avg": "181.64M",\n'
-        '    "pe_ratio": 47.34,\n'
-        '    "revenue_ttm": "187.14B",\n'
-        '    "day_range": {\n'
-        '      "low": 188.02,\n'
-        '      "high": 194.17\n'
-        "    },\n"
-        '    "52w_range": {\n'
-        '      "low": 86.50,\n'
-        '      "high": 211.80\n'
-        "    }\n"
-        "  },\n"
-        '  "upcoming_events": {\n'
-        '    "event_type": "Earnings Report",\n'
-        '    "fiscal_period": "Q4 2025",\n'
-        '    "date": "2026-02-25",\n'
-        '    "timing": "After Market Close"\n'
-        "  },\n"
-        '  "analyst_forecast": {\n'
-        '    "consensus": "Strong Buy",\n'
-        '    "price_target": 260.55,\n'
-        '    "analyst_count": 37\n'
-        "  },\n"
-        '  "related_content": {\n'
-        '    "people_also_bought": [\n'
-        '      "Microsoft",\n'
-        '      "Apple",\n'
-        '      "Alphabet Class A",\n'
-        '      "AMD",\n'
-        '      "Broadcom"\n'
-        "    ]\n"
-        "  },\n"
-        '  "metadata": {\n'
-        '    "source_screenshot_date": "2026-02-02",\n'
-        '    "primary_exchange": "NASDAQ"\n'
-        "  }\n"
-        "}\n"
-    )
-    system_prompt = (
-        "You are a financial data assistant. Respond ONLY with valid JSON. "
-        "Use the exact schema and key names below. If a value is unknown, use null. "
-        "Include the word json in the output format guidance.\n\n"
-        "EXAMPLE JSON OUTPUT:\n"
-        f"{schema_example}"
-    )
-    prompt = (
-        "Provide the json output for the following ticker symbol. "
-        f"Ticker symbol: {symbol}"
-    )
-    try:
-        result = query_openrouter_json(prompt=prompt, system_prompt=system_prompt)
-        text = result.get("text", "")
-        if not text.strip():
-            return jsonify({"error": "OpenRouter returned empty content."}), 502
-        data = extract_json(text)
-        return jsonify({"data": data})
-    except Exception as exc:  # pragma: no cover - surface upstream error
-        current_app.logger.exception(
-            "OpenRouter company lookup failed", extra={"symbol": symbol}
-        )
-        error_message = str(exc)
-        if "OpenRouter error 402" in error_message:
-            return jsonify({"error": "OpenRouter API balance is insufficient."}), 402
-        if "OpenRouter error 429" in error_message:
-            return jsonify({"error": "OpenRouter is rate-limited. Retry shortly."}), 429
-        if "OpenRouter returned empty content" in error_message:
-            return jsonify({"error": "OpenRouter returned empty content."}), 502
-        return jsonify({"error": error_message}), 500
 
 @api.get("/market/watchlist")
 def market_watchlist():
