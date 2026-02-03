@@ -40,6 +40,10 @@ def _format_percent(value: Optional[float]) -> Optional[str]:
     except (TypeError, ValueError):
         return None
 
+def fetch_company_name(symbol: str) -> str:
+    normalized_symbol = _normalize_symbol(symbol)
+    info = yf.Ticker(normalized_symbol).info or {}
+    return info.get("longName") or info.get("shortName") or normalized_symbol
 
 def fetch_quote(symbol: str) -> dict:
     if os.environ.get("MARKET_DATA_MOCK", "false").lower() == "true":

@@ -188,8 +188,27 @@ export default function MarketStock() {
   const [query, setQuery] = useState("");
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [watchlistBusy, setWatchlistBusy] = useState(false);
+  const [tradeOpen, setTradeOpen] = useState(false);
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
+  const [amountMode, setAmountMode] = useState<"amount" | "shares">("amount");
+  const [amountInput, setAmountInput] = useState("0.00");
+  const [sharesInput, setSharesInput] = useState("");
+  const [limitPrice, setLimitPrice] = useState("");
+  const [accountCash, setAccountCash] = useState<number | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [tradeError, setTradeError] = useState<string | null>(null);
+  const [orderBusy, setOrderBusy] = useState(false);
 
   const normalizedSymbol = (symbol ?? "").trim().toUpperCase();
+
+  const sanitizeDecimalInput = (value: string, maxDecimals: number) => {
+    const sanitized = value.replace(/[^0-9.]/g, "");
+    const [intPart, decPart] = sanitized.split(".");
+    if (decPart === undefined) {
+      return intPart;
+    }
+    return `${intPart}.${decPart.slice(0, maxDecimals)}`;
+  };
 
   useEffect(() => {
     if (!normalizedSymbol) {
@@ -264,6 +283,39 @@ export default function MarketStock() {
     };
     void loadStatus();
   }, [normalizedSymbol]);
+
+  const ensureAccessToken = async () => {
+    const token = getAccessToken();
+    if (token) {
+      return token;
+    }
+    return await refreshAccessToken();
+  };
+
+  const loadAccount = async () => {
+    setAccountLoading(true);
+    setTradeError(null);
+    try {
+      const token = await ensureAccessToken();
+      if (!token) {
+        setAccountCash(null);
+        setTradeError("Please log in to place orders.");
+        return;
+      }
+      const response = await fetch(`${API_BASE_URL}/account`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        throw new Error("Unable to load account balance.");
+      }
+      const payload = (await response.json()) as { account?: { cash_balance?: number } };
+      setAccountCash(payload.account?.cash_balance ?? 0);
+    } catch (err) {
+      setTradeError(err instanceof Error ? err.message : "Unable to load account balance.");
+    } finally {
+      setAccountLoading(false);
+    }
+  };
 
   const handleWatchlistToggle = async () => {
     if (!normalizedSymbol || watchlistBusy) {
@@ -340,13 +392,108 @@ export default function MarketStock() {
 
   const quote = data?.quote ?? {};
   const changeAbsolute = quote.change_absolute;
-  const changePercent = quote.change_percentage;
+  const changePercent = quote.change_percentage?.toFixed(2);
   const isPositive = (changeAbsolute ?? 0) >= 0;
   const performance = data?.performance_metrics ?? {};
   const financials = data?.financials ?? {};
   const profile = data?.profile ?? {};
   const latestNews = data?.latest_news ?? [];
   const relatedCompanies = data?.related_companies ?? [];
+  const priceValue = Number(quote.current_price) || 0;
+
+  const handleAmountChange = (value: string) => {
+    const nextValue = sanitizeDecimalInput(value, 2);
+    setAmountInput(nextValue);
+    if (!priceValue) {
+      setSharesInput("");
+      return;
+    }
+    const numeric = Number(nextValue || 0);
+    setSharesInput((numeric / priceValue).toFixed(2));
+  };
+
+  const handleSharesChange = (value: string) => {
+    const nextValue = sanitizeDecimalInput(value, 2);
+    setSharesInput(nextValue);
+    if (!priceValue) {
+      setAmountInput("0.00");
+      return;
+    }
+    const numeric = Number(nextValue || 0);
+    setAmountInput((numeric * priceValue).toFixed(2));
+  };
+
+  const openTradeModal = () => {
+    setTradeError(null);
+    setTradeOpen(true);
+    if (amountMode === "amount") {
+      handleAmountChange(amountInput || "0");
+    } else {
+      handleSharesChange(sharesInput || "0");
+    }
+    void loadAccount();
+  };
+
+  const closeTradeModal = () => {
+    setTradeOpen(false);
+    setOrderBusy(false);
+    setTradeError(null);
+  };
+
+  const handlePlaceOrder = async () => {
+    setTradeError(null);
+    if (!normalizedSymbol) {
+      setTradeError("No symbol selected.");
+      return;
+    }
+    if (!priceValue) {
+      setTradeError("Market price unavailable.");
+      return;
+    }
+    if (orderType === "limit") {
+      setTradeError("Limit orders are not supported yet.");
+      return;
+    }
+    const shares = Number(sharesInput || 0);
+    if (!shares || shares <= 0) {
+      setTradeError("Enter a valid amount.");
+      return;
+    }
+    if (!Number.isInteger(shares)) {
+      setTradeError("Fractional shares are not supported yet.");
+      return;
+    }
+    const token = await ensureAccessToken();
+    if (!token) {
+      setTradeError("Please log in to place orders.");
+      return;
+    }
+    setOrderBusy(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          symbol: normalizedSymbol,
+          side: "BUY",
+          quantity: shares
+        })
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? "Order failed.");
+      }
+      closeTradeModal();
+      void loadAccount();
+    } catch (err) {
+      setTradeError(err instanceof Error ? err.message : "Unable to place order.");
+    } finally {
+      setOrderBusy(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 pt-48">
@@ -410,12 +557,155 @@ export default function MarketStock() {
             >
               {isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
             </button>
-            <button className="rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background">
+            <button
+              className="rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background"
+              onClick={openTradeModal}
+            >
               Trade
             </button>
           </div>
         </div>
       </section>
+
+      {tradeOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closeTradeModal}
+            role="presentation"
+          />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  className={`rounded-full px-4 py-1 text-sm font-semibold transition-all duration-300 ${
+                    amountMode === "amount"
+                      ? "bg-foreground text-background"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                  onClick={() => {
+                    setAmountMode("amount");
+                    handleAmountChange(amountInput || "0");
+                  }}
+                >
+                  Amount
+                </button>
+                <button
+                  className={`rounded-full px-4 py-1 text-sm font-semibold transition-all duration-300 ${
+                    amountMode === "shares"
+                      ? "bg-foreground text-background"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                  onClick={() => {
+                    setAmountMode("shares");
+                    handleSharesChange(sharesInput || "0");
+                  }}
+                >
+                  Shares
+                </button>
+              </div>
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={closeTradeModal}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col w-full">
+              {/* The Visual Container */}
+              <div className="mt-6 rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center w-full focus-within:ring-1 focus-within:ring-primary transition-all">
+                
+                <span className="text-xs uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap mr-4">
+                  {amountMode === "amount" ? "AMOUNT($)" : "SHARES"}
+                </span>
+
+                <div className="flex items-center flex-1 justify-end">
+                  <input
+                    className="bg-transparent text-sm font-semibold outline-none text-right w-full h-full cursor-text"
+                    value={amountMode === "amount" ? amountInput : sharesInput}
+                    onChange={(event) => {
+                      amountMode === "amount" 
+                        ? handleAmountChange(event.target.value) 
+                        : handleSharesChange(event.target.value);
+                    }}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">Stock</div>
+                  <div className="font-semibold">{normalizedSymbol || "—"}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground">Market Price</div>
+                  <div className="font-semibold">
+                    {priceValue ? `$${priceValue.toFixed(2)}` : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 ease-in-out duration-300">
+                <button
+                  className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${
+                    orderType === "market"
+                      ? "bg-foreground text-background"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                  onClick={() => setOrderType("market")}
+                >
+                  Market
+                </button>
+                <button
+                  className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${
+                    orderType === "limit"
+                      ? "bg-foreground text-background"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                  onClick={() => setOrderType("limit")}
+                >
+                  Limit
+                </button>
+              </div>
+              {orderType === "limit" ? (
+                <div className="rounded-xl border border-border px-4 py-3 text-sm">
+                  <div className="text-xs text-muted-foreground">Limit Price</div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-muted-foreground">$</span>
+                    <input
+                      className="w-full bg-transparent text-sm font-semibold outline-none"
+                      value={limitPrice}
+                      onChange={(event) => setLimitPrice(sanitizeDecimalInput(event.target.value, 2))}
+                      inputMode="decimal"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Available USD</span>
+              <span>
+                {accountLoading ? "Loading..." : `$${(accountCash ?? 0).toFixed(2)}`}
+              </span>
+            </div>
+            {tradeError ? <div className="mt-3 text-sm text-rose-500">{tradeError}</div> : null}
+
+            <button
+              className="mt-6 w-full rounded-full bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-60"
+              disabled={orderBusy || accountLoading}
+              onClick={handlePlaceOrder}
+            >
+              {orderBusy ? "Placing Order..." : "Buy"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading company data…</div>
@@ -485,7 +775,7 @@ export default function MarketStock() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Price Target</span>
-                        <span className="font-semibold">{analyst.price_target ?? "—"}</span>
+                        <span className="font-semibold">{analyst.price_target?.toFixed(2) ?? "—"}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Analyst Count</span>
@@ -550,7 +840,7 @@ export default function MarketStock() {
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">P/E Ratio</span>
-                        <span className="font-semibold">{performance.pe_ratio ?? "—"}</span>
+                        <span className="font-semibold">{Number(performance.pe_ratio)?.toFixed(2) ?? "—"}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">52W Range</span>
@@ -566,15 +856,15 @@ export default function MarketStock() {
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">EPS</span>
-                        <span className="font-semibold">{financials.eps ?? "—"}</span>
+                        <span className="font-semibold">{Number(financials.eps)?.toFixed(2) ?? "—"}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">Dividend (Yield)</span>
-                        <span className="font-semibold">{financials.dividend_yield ?? "—"}</span>
+                        <span className="font-semibold">{Number(financials.dividend_yield)?.toFixed(2) ?? "—"}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">Beta</span>
-                        <span className="font-semibold">{financials.beta ?? "—"}</span>
+                        <span className="font-semibold">{Number(financials.beta)?.toFixed(2) ?? "—"}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">1 Year Return</span>
