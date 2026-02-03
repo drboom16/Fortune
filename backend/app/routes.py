@@ -16,8 +16,10 @@ from .market_data import (
     fetch_forex_symbols,
     fetch_quote,
     fetch_watchlist,
+    fetch_company_name,
 )
 from .models import Account, Order, Position, User, WatchlistItem
+from .websocket_manager import ws_manager
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
@@ -167,27 +169,39 @@ def account():
     account = _get_account_for_user(user_id)
     return jsonify({"account": _account_summary(account)})
 
-
 @api.get("/portfolio")
 @jwt_required()
 def portfolio():
     user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
-    positions_payload = []
-    for position in account.positions.all():
-        quote = fetch_quote(position.symbol)
-        last_price = Decimal(str(quote["price"]))
-        unrealized = (last_price - Decimal(position.avg_price)) * Decimal(position.quantity)
-        positions_payload.append(
+    positions = Position.query.filter_by(account_id=account.id).all()
+    
+    portfolio_payload = {
+        "account_cash": float(account.cash_balance),
+        "portfolio": []
+    }
+
+    for position in positions:
+        if position.symbol not in ws_manager.subscribed_symbols:
+            ws_manager.subscribe(position.symbol)
+
+        price = ws_manager.get_price(position.symbol)
+        company_name = fetch_company_name(position.symbol)
+        unrealized = (Decimal(str(price)) - Decimal(str(position.avg_price))) * Decimal(str(position.quantity))
+        unrealized_percentage = unrealized / (Decimal(str(position.avg_price)) * Decimal(str(position.quantity))) * 100
+        portfolio_payload["portfolio"].append(
             {
                 "symbol": position.symbol,
+                "company_name": company_name,
+                "market_price": round(float(price), 2),
                 "quantity": int(position.quantity),
                 "avg_price": float(position.avg_price),
-                "last_price": float(last_price),
-                "unrealized_pnl": float(unrealized),
+                "unrealized_pnl": round(float(unrealized), 2),
+                "unrealized_pnl_percentage": round(float(unrealized_percentage), 2),
+                "net_value": round(float(price * position.quantity), 2),
             }
         )
-    return jsonify({"positions": positions_payload})
+    return jsonify(portfolio_payload)
 
 
 @api.get("/quote")
