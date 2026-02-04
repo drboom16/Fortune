@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Briefcase, Eye, Home, PanelLeft } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { Briefcase, Eye, Home, LogOut, PanelLeft } from "lucide-react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Button } from "./components/ui/button";
 
@@ -10,11 +10,32 @@ const navPad = (open: boolean) => (open ? "px-5" : "justify-center px-0");
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const sidebarWidth = sidebarOpen ? "20rem" : "6rem";
+  const navigate = useNavigate();
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setUserEmail(localStorage.getItem("user_email"));
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        setShowLogoutPopup(false);
+      }
+    }
+
+    if (showLogoutPopup) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showLogoutPopup]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user_email");
+    navigate("/login");
+  };
 
   return (
     <div
@@ -23,7 +44,7 @@ export default function App() {
     >
       <div className="h-full">
         <aside
-          className={`fixed inset-y-0 left-0 shrink-0 border-r border-border bg-card pb-8 pt-0 transition-all duration-300 ${
+          className={`fixed inset-y-0 left-0 shrink-0 border-r border-border bg-card pb-8 pt-0 transition-all duration-300 flex flex-col ${
             sidebarOpen ? "w-80 px-8" : "w-24 px-5"
           }`}
         >
@@ -45,9 +66,6 @@ export default function App() {
                 <PanelLeft className="h-7 w-7" />
               </Button>
             </div>
-            {sidebarOpen && userEmail ? (
-              <p className="text-xs text-muted-foreground">{userEmail}</p>
-            ) : null}
           </div>
           <nav className="flex flex-col gap-4">
             <NavLink
@@ -81,6 +99,52 @@ export default function App() {
               {sidebarOpen ? <span>Portfolio</span> : <Briefcase className="h-7 w-7 shrink-0" />}
             </NavLink>
           </nav>
+
+          {/* Bottom Section: User Email */}
+          <div className="mt-auto pt-4 relative" ref={popupRef}>
+            {sidebarOpen && userEmail ? (
+              <button
+                onClick={() => setShowLogoutPopup(!showLogoutPopup)}
+                className="w-full rounded-xl border border-border bg-muted/40 p-4 hover:bg-muted/60 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                    {userEmail.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+                      Account
+                    </p>
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {userEmail}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ) : userEmail ? (
+              <button
+                onClick={() => setShowLogoutPopup(!showLogoutPopup)}
+                className="flex justify-center w-full hover:opacity-80 transition-opacity"
+              >
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                  {userEmail.charAt(0).toUpperCase()}
+                </div>
+              </button>
+            ) : null}
+
+            {/* Logout Popup */}
+            {showLogoutPopup && (
+              <div className={`absolute bottom-full ${sidebarOpen ? 'left-0 right-0' : 'left-1/2 -translate-x-1/2'} bg-card border border-border rounded-xl overflow-hidden z-50`}>
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2 flex items-center gap-3 hover:bg-muted transition-colors text-left"
+                >
+                  <LogOut className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Log out</span>
+                </button>
+              </div>
+            )}
+          </div>
         </aside>
 
         <div
