@@ -4,8 +4,34 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Button } from "./components/ui/button";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
 const navBase = "flex items-center rounded-xl py-4 text-left text-base font-medium";
 const navPad = (open: boolean) => (open ? "px-5" : "justify-center px-0");
+
+const logout = async () => {
+  const accessToken = localStorage.getItem("access_token");
+  const refreshToken = localStorage.getItem("refresh_token");
+
+  if (!accessToken || !refreshToken) return;
+
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+    });
+  } catch (err) {
+    console.error('Logout error: ', err);
+  } finally {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user_email");
+  }
+}
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -32,8 +58,8 @@ export default function App() {
     }
   }, [showLogoutPopup]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user_email");
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
   };
 
