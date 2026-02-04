@@ -35,6 +35,7 @@ const refreshAccessToken = async () => {
 
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
+    credentials: 'include',
     headers: { Authorization: `Bearer ${refreshToken}` }
   });
 
@@ -68,6 +69,7 @@ export default function Portfolio() {
       }
 
       let response = await fetch(`${API_BASE_URL}/portfolio`, {
+        credentials: 'include',
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -78,6 +80,7 @@ export default function Portfolio() {
         }
 
         response = await fetch(`${API_BASE_URL}/portfolio`, {
+          credentials: 'include',
           headers: { Authorization: `Bearer ${refreshed}`}
         });
       }

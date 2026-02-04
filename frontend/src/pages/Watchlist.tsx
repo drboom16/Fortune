@@ -28,6 +28,7 @@ const refreshAccessToken = async () => {
   }
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
+    credentials: 'include',
     headers: { Authorization: `Bearer ${refreshToken}` }
   });
   if (!response.ok) {
@@ -59,6 +60,7 @@ export default function Watchlist() {
         return;
       }
       let response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+        credentials: 'include',
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.status === 401 || response.status === 422) {
@@ -69,6 +71,7 @@ export default function Watchlist() {
           return;
         }
         response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+          credentials: 'include',
           headers: { Authorization: `Bearer ${refreshed}` }
         });
       }

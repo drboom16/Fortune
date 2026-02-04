@@ -85,6 +85,7 @@ const refreshAccessToken = async () => {
   }
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
+    credentials: 'include',
     headers: { Authorization: `Bearer ${refreshToken}` }
   });
   if (!response.ok) {
@@ -256,6 +257,7 @@ export default function MarketStock() {
           return;
         }
         let response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+          credentials: 'include',
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.status === 401 || response.status === 422) {
@@ -265,6 +267,7 @@ export default function MarketStock() {
             return;
           }
           response = await fetch(`${API_BASE_URL}/market/watchlist`, {
+            credentials: 'include',
             headers: { Authorization: `Bearer ${refreshed}` }
           });
         }
@@ -303,6 +306,7 @@ export default function MarketStock() {
         return;
       }
       const response = await fetch(`${API_BASE_URL}/account`, {
+        credentials: 'include',
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) {
@@ -336,6 +340,7 @@ export default function MarketStock() {
         `${API_BASE_URL}/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
         {
           method: isInWatchlist ? "DELETE" : "POST",
+          credentials: 'include',
           headers: {
             Authorization: `Bearer ${token}`,
             ...(isInWatchlist ? {} : { "Content-Type": "application/json" })
@@ -353,6 +358,7 @@ export default function MarketStock() {
           `${API_BASE_URL}/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
           {
             method: isInWatchlist ? "DELETE" : "POST",
+            credentials: 'include',
             headers: {
               Authorization: `Bearer ${refreshed}`,
               ...(isInWatchlist ? {} : { "Content-Type": "application/json" })
@@ -472,6 +478,7 @@ export default function MarketStock() {
     try {
       const response = await fetch(`${API_BASE_URL}/orders`, {
         method: "POST",
+        credentials: 'include',
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"

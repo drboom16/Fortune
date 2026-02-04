@@ -1,4 +1,5 @@
 from decimal import Decimal
+from re import A
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
@@ -22,6 +23,8 @@ from .models import Account, Order, Position, User, WatchlistItem
 from .websocket_manager import ws_manager
 
 api = Blueprint("api", __name__, url_prefix="/api")
+
+blacklisted_tokens = set() # In memory token blacklist
 
 def _normalize_watchlist_symbol(symbol: str) -> str:
     return symbol.strip().upper()
@@ -99,9 +102,26 @@ def login():
 
     access_token = create_access_token(identity=str(user.id))
     refresh_token = create_refresh_token(identity=str(user.id))
-    return jsonify(
-        {"access_token": access_token, "refresh_token": refresh_token, "user": user.to_dict()}
+    
+    response = jsonify(
+        {
+            "access_token": access_token, 
+            "refresh_token": refresh_token, 
+            "user": user.to_dict()
+        }
     )
+    
+    response.set_cookie(
+        'refresh_token',
+        refresh_token,
+        httponly=True,
+        secure=False, # set to True in production with HTTPS
+        samesite='Lax',
+        max_age=7*24*60*60, # 7 days
+        path='/'
+    )
+
+    return response, 200
 
 
 @api.post("/auth/refresh")
@@ -110,6 +130,33 @@ def refresh():
     user_id = int(get_jwt_identity())
     access_token = create_access_token(identity=str(user_id))
     return jsonify({"access_token": access_token})
+
+
+@api.post("/auth/logout")
+@jwt_required()
+def logout():
+    access_token = request.headers.get("Authorization")
+    refresh_token = request.cookies.get("refresh_token")
+
+    if access_token and access_token.startswith('Bearer '):
+        access_token = access_token[7:]
+        blacklisted_tokens.add(access_token)
+
+    if refresh_token:
+        blacklisted_tokens.add(refresh_token)
+
+    response = jsonify({'message': 'Successfully logged out'})
+    response.set_cookie(
+        'refresh_token',
+        '',
+        httponly=True,
+        secure=False, # set to True in production with HTTPS
+        samesite='Lax',
+        expires=0,
+        path='/'
+    )
+
+    return response, 200
 
 
 @api.get("/market/watchlist")

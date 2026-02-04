@@ -32,6 +32,7 @@ export default function Auth() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/${mode}`, {
         method: "POST",
+        credentials: 'include',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
@@ -62,6 +63,7 @@ export default function Auth() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
+        credentials: 'include',
         headers: { Authorization: `Bearer ${refreshToken}` }
       });
       if (!response.ok) {
