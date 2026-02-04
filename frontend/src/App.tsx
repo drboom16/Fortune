@@ -44,106 +44,107 @@ export default function App() {
     >
       <div className="h-full">
         <aside
-          className={`fixed inset-y-0 left-0 shrink-0 border-r border-border bg-card pb-8 pt-0 transition-all duration-300 flex flex-col ${
-            sidebarOpen ? "w-80 px-8" : "w-24 px-5"
+          className={`fixed inset-y-0 left-0 shrink-0 border-r border-border bg-card transition-all duration-300 flex flex-col ${
+            sidebarOpen ? "w-80" : "w-24"
           }`}
         >
-          <div className="mb-10 flex flex-col gap-4 pt-5">
-            <div className="flex items-center justify-between">
-              {sidebarOpen ? (
-                <p className="text-lg uppercase tracking-[0.45em] text-muted-foreground">
-                  Fortune
-                </p>
-              ) : (
-                <span />
-              )}
-              <Button
-                variant="ghost"
-                className="h-14 w-14 rounded-xl"
-                onClick={() => setSidebarOpen((open) => !open)}
-                aria-label="Toggle sidebar"
-              >
-                <PanelLeft className="h-7 w-7" />
-              </Button>
-            </div>
-          </div>
-          <nav className="flex flex-col gap-4">
-            <NavLink
-              to="/home"
-              className={({ isActive }: { isActive: boolean }) =>
-                `${navBase} ${navPad(sidebarOpen)} ${
-                  isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
-                }`
-              }
-            >
-              {sidebarOpen ? <span>Home</span> : <Home className="h-7 w-7 shrink-0" />}
-            </NavLink>
-            <NavLink
-              to="/watchlist"
-              className={({ isActive }: { isActive: boolean }) =>
-                `${navBase} ${navPad(sidebarOpen)} ${
-                  isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
-                }`
-              }
-            >
-              {sidebarOpen ? <span>Watchlist</span> : <Eye className="h-7 w-7 shrink-0" />}
-            </NavLink>
-            <NavLink
-              to="/portfolio"
-              className={({ isActive }: { isActive: boolean }) =>
-                `${navBase} ${navPad(sidebarOpen)} ${
-                  isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
-                }`
-              }
-            >
-              {sidebarOpen ? <span>Portfolio</span> : <Briefcase className="h-7 w-7 shrink-0" />}
-            </NavLink>
-          </nav>
-
-          {/* Bottom Section: User Email */}
-          <div className="mt-auto pt-4 relative" ref={popupRef}>
-            {sidebarOpen && userEmail ? (
-              <button
-                onClick={() => setShowLogoutPopup(!showLogoutPopup)}
-                className="w-full rounded-xl border border-border bg-muted/40 p-4 hover:bg-muted/60 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                    {userEmail.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
-                      Account
-                    </p>
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {userEmail}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ) : userEmail ? (
-              <button
-                onClick={() => setShowLogoutPopup(!showLogoutPopup)}
-                className="flex justify-center w-full hover:opacity-80 transition-opacity"
-              >
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                  {userEmail.charAt(0).toUpperCase()}
-                </div>
-              </button>
-            ) : null}
-
-            {/* Logout Popup */}
-            {showLogoutPopup && (
-              <div className={`absolute bottom-full ${sidebarOpen ? 'left-0 right-0' : 'left-1/2 -translate-x-1/2'} bg-card border border-border rounded-xl overflow-hidden z-50`}>
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-2 flex items-center gap-3 hover:bg-muted transition-colors text-left"
+          <div className="flex-1 flex flex-col">
+            {/* Header section */}
+            <div className={`mb-10 flex flex-col gap-4 pt-5 ${sidebarOpen ? "px-8" : "px-5"}`}>
+              <div className="flex items-center justify-between">
+                {sidebarOpen ? (
+                  <p className="text-lg uppercase tracking-[0.45em] text-muted-foreground">
+                    Fortune
+                  </p>
+                ) : (
+                  <span />
+                )}
+                <Button
+                  variant="ghost"
+                  className="h-14 w-14 rounded-xl"
+                  onClick={() => setSidebarOpen((open) => !open)}
+                  aria-label="Toggle sidebar"
                 >
-                  <LogOut className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Log out</span>
-                </button>
+                  <PanelLeft className="h-7 w-7" />
+                </Button>
               </div>
-            )}
+            </div>
+
+            {/* Navigation links */}
+            <nav className={`flex flex-col gap-4 ${sidebarOpen ? "px-8" : "px-5"}`}>
+              <NavLink
+                to="/home"
+                className={({ isActive }: { isActive: boolean }) =>
+                  `${navBase} ${navPad(sidebarOpen)} ${
+                    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
+                  }`
+                }
+              >
+                {sidebarOpen ? <span>Home</span> : <Home className="h-7 w-7 shrink-0" />}
+              </NavLink>
+              <NavLink
+                to="/watchlist"
+                className={({ isActive }: { isActive: boolean }) =>
+                  `${navBase} ${navPad(sidebarOpen)} ${
+                    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
+                  }`
+                }
+              >
+                {sidebarOpen ? <span>Watchlist</span> : <Eye className="h-7 w-7 shrink-0" />}
+              </NavLink>
+              <NavLink
+                to="/portfolio"
+                className={({ isActive }: { isActive: boolean }) =>
+                  `${navBase} ${navPad(sidebarOpen)} ${
+                    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
+                  }`
+                }
+              >
+                {sidebarOpen ? <span>Portfolio</span> : <Briefcase className="h-7 w-7 shrink-0" />}
+              </NavLink>
+            </nav>
+          </div>
+
+          {/* Bottom Section: User Email or Logout Icon */}
+          <div 
+            className={`mt-auto bg-card ${sidebarOpen ? "px-8" : "px-5"} pt-2 pb-3`}
+            ref={popupRef}
+          >
+            {sidebarOpen && userEmail ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowLogoutPopup(!showLogoutPopup)}
+                  className="w-full flex items-center hover:bg-muted transition-colors rounded-lg text-left p-3"
+                >
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                      {userEmail.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+                        Account
+                      </p>
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {userEmail}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Logout Popup */}
+                {showLogoutPopup && (
+                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg overflow-hidden z-40">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted transition-colors text-foreground"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="text-sm font-medium">Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null} 
           </div>
         </aside>
 

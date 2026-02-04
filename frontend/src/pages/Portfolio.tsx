@@ -180,6 +180,7 @@ export default function Portfolio() {
         )}
       </div>
 
+      {/* Bottom Section: Portfolio Value */}
       <div className="fixed bottom-0 z-30 left-[var(--sidebar-width)] right-0 border-t border-border/40 bg-card/95 backdrop-blur transition-[left] duration-300 ease-in-out">
         <div className="grid grid-cols-7 items-center gap-2 px-8 py-4 text-center">
           <div>
