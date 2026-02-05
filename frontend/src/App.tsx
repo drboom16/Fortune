@@ -119,7 +119,7 @@ export default function App() {
                 {sidebarOpen ? <span>Watchlist</span> : <Eye className="h-7 w-7 shrink-0" />}
               </NavLink>
               <NavLink
-                to="/portfolio"
+                to="/portfolio/overview"
                 className={({ isActive }: { isActive: boolean }) =>
                   `${navBase} ${navPad(sidebarOpen)} ${
                     isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
