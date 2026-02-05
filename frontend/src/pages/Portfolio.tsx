@@ -62,44 +62,57 @@ export default function Portfolio() {
 
   useEffect(() => {
     setLoading(true);
-    const loadStatus = async () => {
-      const token = getAccessToken();
-      if (!token) {
-        return;
-      }
+    const loadStatus = async (showLoading: boolean) => {
+      if (showLoading) setLoading(true);
 
-      let response = await fetch(`${API_BASE_URL}/portfolio`, {
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (response.status === 401 || response.status === 422) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
+      try {
+        const token = getAccessToken();
+        if (!token) {
           return;
         }
-
-        response = await fetch(`${API_BASE_URL}/portfolio`, {
+  
+        let response = await fetch(`${API_BASE_URL}/portfolio`, {
           credentials: 'include',
-          headers: { Authorization: `Bearer ${refreshed}`}
+          headers: { Authorization: `Bearer ${token}` }
         });
+  
+        if (response.status === 401 || response.status === 422) {
+          const refreshed = await refreshAccessToken();
+          if (!refreshed) {
+            return;
+          }
+  
+          response = await fetch(`${API_BASE_URL}/portfolio`, {
+            credentials: 'include',
+            headers: { Authorization: `Bearer ${refreshed}`}
+          });
+        }
+  
+        if (!response.ok) {
+          throw new Error("Failed to load portfolio.");
+        }
+  
+        const payload = (await response.json()) as { account_cash: number, portfolio: Position[] };
+        const positions = Array.isArray(payload.portfolio) ? payload.portfolio : [];
+        setPositionsPayload(positions);
+        setAccountCash(payload.account_cash);
+        setTotalInvested(positions.reduce((acc, position) => acc + position.avg_price * position.quantity, 0));
+        setProfitLoss(positions.reduce((acc, position) => acc + position.unrealized_pnl, 0));
+        setPortfolioValue(payload.account_cash + (positions.reduce((acc, position) => acc + position.avg_price * position.quantity, 0) ?? 0) + (positions.reduce((acc, position) => acc + position.unrealized_pnl, 0) ?? 0));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (showLoading) setLoading(false);
       }
-
-      if (!response.ok) {
-        throw new Error("Failed to load portfolio.");
-      }
-
-      const payload = (await response.json()) as { account_cash: number, portfolio: Position[] };
-      const positions = Array.isArray(payload.portfolio) ? payload.portfolio : [];
-      setPositionsPayload(positions);
-      setAccountCash(payload.account_cash);
-      setTotalInvested(positions.reduce((acc, position) => acc + position.avg_price * position.quantity, 0));
-      setProfitLoss(positions.reduce((acc, position) => acc + position.unrealized_pnl, 0));
-      setPortfolioValue(payload.account_cash + (positions.reduce((acc, position) => acc + position.avg_price * position.quantity, 0) ?? 0) + (positions.reduce((acc, position) => acc + position.unrealized_pnl, 0) ?? 0));
-      setLoading(false);
     }
 
-    loadStatus();
+    loadStatus(true);
+
+    const interval = setInterval(() => {
+      loadStatus(false);
+    }, 2000); // Refresh every 2 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
