@@ -2,7 +2,7 @@ import asyncio
 import threading
 import yfinance as yf
 from datetime import datetime
-from typing import Set, Dict, Callable
+from typing import Set, Dict, Optional
 
 # Singleton pattern for the app instances' websocket connection
 
@@ -27,6 +27,7 @@ class WebSocketPriceManager:
         self.subscribed_symbols: Set[str] = set()
         self.ws = None
         self.running = False
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._initialized = True
 
     def handle_message(self, message: dict): 
@@ -57,13 +58,18 @@ class WebSocketPriceManager:
         self.running = True
 
         def run_in_thread():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Create and store the event loop for this thread
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+
             try:
-                loop.run_until_complete(self._run_websocket())
+                self.loop.run_until_complete(self._run_websocket())
             except Exception as e:
                 print(f"WebSocket error: {e}")
                 self.running = False
+            finally:
+                self.loop.close()
+                self.loop = None
 
         thread = threading.Thread(target=run_in_thread, daemon=True)
         thread.start()
@@ -74,13 +80,20 @@ class WebSocketPriceManager:
         if symbol not in self.subscribed_symbols:
             self.subscribed_symbols.add(symbol)
 
-            if self.ws and self.running:
-                asyncio.run_coroutine_threadsafe(
-                    self.ws.subscribe([symbol]),
-                    asyncio.get_event_loop()
-                )
-                print(f"Subscribed to {symbol} via WebSocket")
-
+            if self.ws and self.running and self.loop and not self.loop.is_closed():
+                try:
+                    # Use the stored loop from the WebSocket thread
+                    asyncio.run_coroutine_threadsafe(
+                        self.ws.subscribe([symbol]),
+                        self.loop # Use the WebSocket thread's loop
+                    )
+                    print(f"Subscribed to {symbol} via WebSocket")
+                except Exception as e:
+                    print(f"Failed to subscribe to {symbol}: {e}")
+            else:
+                # WebSocket not ready yet - symbol will be subscribed when WebSocket starts
+                print(f"Queued {symbol} for WebSocket subscription")
+                
     def get_price(self, symbol: str) -> float:
         """Get the price for a symbol from the cache"""
         return self.price_cache.get(symbol, 0.0)
