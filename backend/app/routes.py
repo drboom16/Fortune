@@ -1,5 +1,6 @@
 from decimal import Decimal
-from re import A
+import yfinance as yf
+from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
@@ -54,6 +55,35 @@ def _account_summary(account: Account) -> dict:
         "equity_value": float(equity_value),
         "total_value": float(total_value),
     }
+
+def get_current_price(symbol: str) -> float:
+    """Get the current price for a symbol from the WebSocket cache or fetch from API"""
+
+    # Try WebSocket cache first
+    ws_price = ws_manager.get_price(symbol)
+
+    if ws_price and ws_price > 0:
+        last_update = ws_manager.get_last_update(symbol)
+
+        if last_update and (datetime.now() - last_update).total_seconds() < 5:
+            return ws_price
+
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+        price = info.get("regularMarketPrice")
+        if price and price > 0:
+            # Update cache for next time
+            ws_manager.price_cache[symbol] = float(price)
+            ws_manager.last_update[symbol] = datetime.now()
+            return float(price)
+
+    except Exception as e:
+        print(f"Error fetching price for {symbol}: {e}")
+        return 0.0
+
+    # Simply return the cached price even if stale
+    return ws_price if ws_price > 0 else 0.0
 
 
 @api.post("/auth/register")
@@ -232,10 +262,11 @@ def portfolio():
         if position.symbol not in ws_manager.subscribed_symbols:
             ws_manager.subscribe(position.symbol)
 
-        price = ws_manager.get_price(position.symbol)
+        price = get_current_price(position.symbol)
         company_name = fetch_company_name(position.symbol)
         unrealized = (Decimal(str(price)) - Decimal(str(position.avg_price))) * Decimal(str(position.quantity))
         unrealized_percentage = unrealized / (Decimal(str(position.avg_price)) * Decimal(str(position.quantity))) * 100
+
         portfolio_payload["portfolio"].append(
             {
                 "symbol": position.symbol,
@@ -348,3 +379,43 @@ def orders():
     account = _get_account_for_user(user_id)
     orders_payload = [order.to_dict() for order in account.orders.order_by(Order.id.desc())]
     return jsonify({"orders": orders_payload})
+
+@api.post("/sell")
+@jwt_required()
+def sell_stock():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+
+    symbol = data.get("symbol", "").upper()
+    quantity = data.get("quantity")
+
+    # Get reliable current price for the sale
+    current_price = get_current_price(symbol)
+
+    if current_price <= 0:
+        return jsonify({"error": "Failed to get current price"}), 400
+
+    sale_value = Decimal(str(current_price)) * Decimal(str(quantity))
+
+    account = _get_account_for_user(user_id)
+    position = account.positions.filter_by(symbol=symbol).first()
+    if not position or position.quantity < quantity:
+        return jsonify({"error": "Insufficient shares"}), 400
+
+    account.cash_balance += sale_value
+    position.quantity -= quantity
+    if position.quantity == 0:
+        db.session.delete(position)
+
+    order = Order(
+        account_id=account.id,
+        symbol=symbol,
+        side="SELL",
+        quantity=quantity,
+        price=Decimal(str(current_price)),
+        status="FILLED",
+    )
+    db.session.add(order)
+    db.session.commit()
+
+    return jsonify({"order": order.to_dict(), "account": _account_summary(account)})

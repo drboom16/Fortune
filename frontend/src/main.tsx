@@ -19,7 +19,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="home" element={<Home />} />
           <Route path="market/:symbol" element={<MarketStock />} />
           <Route path="watchlist" element={<Watchlist />} />
-          <Route path="portfolio" element={<Portfolio />} />
+          <Route path="portfolio/overview" element={<Portfolio />} />
         </Route>
       </Routes>
     </BrowserRouter>
