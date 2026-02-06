@@ -19,6 +19,7 @@ from .market_data import (
     fetch_quote,
     fetch_watchlist,
     fetch_company_name,
+    is_market_open,
 )
 from .models import Account, Order, Position, User, WatchlistItem
 from .websocket_manager import ws_manager
@@ -365,6 +366,8 @@ def create_order():
         quantity=quantity,
         price=price,
         status="FILLED",
+        exchange=quote.get("exchange", ""),
+        currency=quote.get("currency", ""),
     )
     db.session.add(order)
     db.session.commit()
@@ -450,6 +453,8 @@ def portfolio_breakdown(symbol):
             "net_value": round(float(net_value), 2),
             "stop_loss_price": float(order.stop_loss_price) if order.stop_loss_price else None,
             "take_profit_price": float(order.take_profit_price) if order.take_profit_price else None,
+            "exchange": order.exchange,
+            "currency": order.currency,
         })
 
     return jsonify({"order_history": order_history_payload})
@@ -469,3 +474,10 @@ def set_thresholds():
     order.take_profit_price = Decimal(str(payload.get("take_profit_price")))
     db.session.commit()
     return jsonify({"message": "Thresholds set successfully"}), 200
+
+@api.get("/market/status")
+def market_status():
+    symbol = request.args.get("symbol", "").upper()
+    if not symbol:
+        return jsonify({"error": "Symbol required"}), 400
+    return jsonify({"market_status": is_market_open(symbol)})

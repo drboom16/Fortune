@@ -66,6 +66,8 @@ class Order(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     stop_loss_price = db.Column(db.Numeric(10, 4), nullable=True) # Optional
     take_profit_price = db.Column(db.Numeric(10, 4), nullable=True) # Optional
+    exchange = db.Column(db.String(16), nullable=True) # Optional
+    currency = db.Column(db.String(16), nullable=True) # Optional
 
     account = db.relationship("Account", back_populates="orders")
 
@@ -80,6 +82,8 @@ class Order(db.Model):
             "created_at": self.created_at.isoformat() + "Z",
             "stop_loss_price": float(self.stop_loss_price) if self.stop_loss_price else None,
             "take_profit_price": float(self.take_profit_price) if self.take_profit_price else None,
+            "exchange": self.exchange,
+            "currency": self.currency,
         }
 
 
