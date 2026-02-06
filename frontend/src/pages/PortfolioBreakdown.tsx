@@ -31,6 +31,8 @@ interface Order {
   net_value: number;
   stop_loss_price?: number;
   take_profit_price?: number;
+  exchange?: string;
+  currency?: string;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -77,7 +79,12 @@ export default function PortfolioBreakdown() {
   const [order, setOrder] = useState<Order | null>(null);
   const [stopLossPrice, setStopLossPrice] = useState<string>("");
   const [takeProfitPrice, setTakeProfitPrice] = useState<string>("");
-
+  const [marketStatus, setMarketStatus] = useState<boolean>(false);
+  const [marketPrice, setMarketPrice] = useState<number>(0);
+  const [marketPriceChange, setMarketPriceChange] = useState<number>(0);
+  const [marketPriceChangePercentage, setMarketPriceChangePercentage] = useState<number>(0);
+  
+  console.log("marketStatus", marketStatus);
   const handleOrderOpen = (id: number) => {
     setOrderOpen(true);
     setOrder(orderHistory?.find((o: Order) => o.id === id) ?? null);
@@ -141,6 +148,9 @@ export default function PortfolioBreakdown() {
         const payload = (await response.json()) as { order_history: Order[] };
         const orderHistory = Array.isArray(payload.order_history) ? payload.order_history : [];
         setOrderHistory(orderHistory);
+        setMarketPrice(orderHistory[0].market_price);
+        setMarketPriceChange(orderHistory[0].unrealized_pnl);
+        setMarketPriceChangePercentage(orderHistory[0].unrealized_pnl_percentage);
       } catch (error) {
         console.error(error);
       } finally {
@@ -149,13 +159,22 @@ export default function PortfolioBreakdown() {
     }
 
     loadStatus(true);
-
     const interval = setInterval(() => {
       loadStatus(false);
     }, 2000); // Refresh every 2 seconds
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loadMarketStatus = async () => {
+      const response = await fetch(`${API_BASE_URL}/market/status?symbol=${symbol}`);
+      if (!response.ok) throw new Error("Failed to load market status.");
+      const payload = (await response.json()) as { market_status: boolean };
+      setMarketStatus(payload.market_status);
+    }
+    loadMarketStatus();
+  }, [orderOpen]);
 
   return (
     <div>
@@ -210,11 +229,12 @@ export default function PortfolioBreakdown() {
                       <div>
                         <div className="font-semibold text-base">{order.symbol}</div>
                         <div className="text-xs text-muted-foreground">{order.company_name}</div>
+                        <div className="mt-1 text-[8px] text-muted-foreground">{marketStatus ? "Market open" : "Market closed"} • Prices by {order.exchange}, in {order.currency}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-base">${order.market_price.toFixed(2)}</div>
-                        <div className={`text-xs font-medium ${order.unrealized_pnl_percentage >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {order.unrealized_pnl_percentage >= 0 ? "+" : ""}{order.unrealized_pnl_percentage.toFixed(2)}%
+                        <div className="font-semibold text-base">${marketPrice.toFixed(2)}</div>
+                        <div className={`text-xs font-medium ${marketPriceChangePercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {marketPriceChangePercentage >= 0 ? "+" : ""}{marketPriceChangePercentage.toFixed(2)}%
                         </div>
                       </div>
                     </div>
@@ -271,8 +291,8 @@ export default function PortfolioBreakdown() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Unrealized P/L</span>
-                      <span className={`font-medium ${order.unrealized_pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {order.unrealized_pnl >= 0 ? "$" : "-$"}{Math.abs(order.unrealized_pnl).toFixed(2)}
+                      <span className={`font-medium ${marketPriceChange >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {marketPriceChange >= 0 ? "$" : "-$"}{Math.abs(marketPriceChange).toFixed(2)}
                       </span>
                     </div>
                     <div className="border-t border-border pt-3">

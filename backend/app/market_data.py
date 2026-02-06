@@ -89,6 +89,8 @@ def fetch_quote(symbol: str) -> dict:
         "previous_close": float(previous_close_value) if previous_close_value is not None else 0.0,
         "change": float(change_value) if change_value is not None else 0.0,
         "change_percent": float(change_percent_value) if change_percent_value is not None else 0.0,
+        "exchange": info.get("exchange") or fast_info.get("exchange"),
+        "currency": info.get("currency") or fast_info.get("currency"),
     }
 
 
@@ -332,3 +334,11 @@ def fetch_company_snapshot(symbol: str) -> dict:
             "primary_exchange": info.get("exchange") or info.get("fullExchangeName"),
         },
     }
+
+def is_market_open(symbol: str) -> bool:
+    normalized = _normalize_symbol(symbol)
+    ticker = yf.Ticker(normalized)
+    info = ticker.info or {}
+    fast_info = getattr(ticker, "fast_info", {}) or {}
+    market_state = info.get("marketState") or fast_info.get("market_state")
+    return str(market_state).upper() == "REGULAR" 
