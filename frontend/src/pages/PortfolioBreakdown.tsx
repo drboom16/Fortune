@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, ChevronLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { Skeleton } from "../components/ui/skeleton";
@@ -19,6 +19,8 @@ interface Position {
 }
 
 interface Order {
+  id: number,
+  created_at: string,
   symbol: string,
   company_name: string,
   market_price: number,
@@ -27,6 +29,8 @@ interface Order {
   unrealized_pnl: number,
   unrealized_pnl_percentage: number,
   net_value: number;
+  stop_loss_price?: number;
+  take_profit_price?: number;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -67,8 +71,38 @@ const refreshAccessToken = async () => {
 export default function PortfolioBreakdown() {
   const [loading, setLoading] = useState(false);
   const [orderHistory, setOrderHistory] = useState<Order[] | null>(null);
+  const [orderOpen, setOrderOpen] = useState(false); // Displays a modal which enables configuring SL and TP
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [stopLossPrice, setStopLossPrice] = useState<string>("");
+  const [takeProfitPrice, setTakeProfitPrice] = useState<string>("");
+
+  const handleOrderOpen = (id: number) => {
+    setOrderOpen(true);
+    setOrder(orderHistory?.find((o: Order) => o.id === id) ?? null);
+  }
+
+  const handleUpdateThresholds = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    if (!order) return;
+    const response = await fetch(`${API_BASE_URL}/portfolio/breakdown/thresholds`, {
+      method: "POST",
+      credentials: 'include',
+      headers: { 
+        Authorization: `Bearer ${token}`, 
+        "Content-Type": "application/json" 
+      },
+      body: JSON.stringify({ 
+        id: order.id,
+        stop_loss_price: parseFloat(stopLossPrice), 
+        take_profit_price: parseFloat(takeProfitPrice) 
+      })
+    });
+    if (!response.ok) throw new Error("Failed to update thresholds.");
+    setOrderOpen(false);
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -141,6 +175,131 @@ export default function PortfolioBreakdown() {
           </Button>
         </div>
       </section>
+      {orderOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-background/80"
+            onClick={() => setOrderOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
+            
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-semibold">Buy Position</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ID#{order?.id.toString()}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => setOrderOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {(() => {
+              if (!order) return null;
+
+              return (
+                <>
+                  <div className="mb-6 p-4 border border-border rounded-lg bg-muted/40">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="font-semibold text-base">{order.symbol}</div>
+                        <div className="text-xs text-muted-foreground">{order.company_name}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-base">${order.market_price.toFixed(2)}</div>
+                        <div className={`text-xs font-medium ${order.unrealized_pnl_percentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {order.unrealized_pnl_percentage >= 0 ? "+" : ""}{order.unrealized_pnl_percentage.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-2">Stop Loss Price (SL)</label>
+                      <input 
+                        type="number" 
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={stopLossPrice}
+                        onChange={(e) => setStopLossPrice(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-2">Take Profit Price (TP)</label>
+                      <input 
+                        type="number" 
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={takeProfitPrice}
+                        onChange={(e) => setTakeProfitPrice(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-6 p-4 border border-border rounded-lg space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Shares Owned</span>
+                      <span className="font-medium">{order.quantity}</span>
+                    </div>
+                    <div className="flex justify-between items-start text-sm">
+                      <span className="text-muted-foreground">Opening Price</span>
+                      
+                      {/* Right-aligned container for Price and Date */}
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold text-foreground">
+                          ${order.price.toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(order.created_at).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })} | {new Date(order.created_at).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Unrealized P/L</span>
+                      <span className={`font-medium ${order.unrealized_pnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {order.unrealized_pnl >= 0 ? "$" : "-$"}{Math.abs(order.unrealized_pnl).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="border-t border-border pt-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">Net Position Value</span>
+                        <span className="font-semibold">${order.net_value.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleUpdateThresholds}>
+                      Update Thresholds
+                    </Button>
+                    <Button 
+                      variant="ghost"
+                      className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                    >
+                      Close Trade
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       <div className="py-8 translate-y-[-7px]">
         {loading ? (
@@ -167,7 +326,7 @@ export default function PortfolioBreakdown() {
             </TableHeader>
             <TableBody>
               {orderHistory.map((order: Order) => (
-                <TableRow key={order.symbol}>
+                <TableRow key={order.id} className="cursor-pointer" onClick={() => handleOrderOpen(order.id)}>
                   <TableCell>
                     <div className="font-semibold">{order.symbol}</div>
                     <div className="text-xs text-muted-foreground">
@@ -181,10 +340,10 @@ export default function PortfolioBreakdown() {
                     <div className="text-sm font-medium">{order.market_price.toFixed(2)}</div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="text-sm font-medium">{}</div>
+                    <div className="text-sm font-medium">{order.stop_loss_price ? order.stop_loss_price.toFixed(2) : "---"}</div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="text-sm font-medium">{}</div>
+                    <div className="text-sm font-medium">{order.take_profit_price ? order.take_profit_price.toFixed(2) : "---"}</div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="text-sm font-medium ">${order.price.toFixed(2)}</div>
