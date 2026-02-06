@@ -419,3 +419,33 @@ def sell_stock():
     db.session.commit()
 
     return jsonify({"order": order.to_dict(), "account": _account_summary(account)})
+
+
+@api.get("/portfolio/breakdown/<symbol>")
+@jwt_required()
+def portfolio_breakdown(symbol):
+    user_id = int(get_jwt_identity())
+    account = _get_account_for_user(user_id)
+    order_history_with_symbol: list[Order] = Order.query.filter_by(account_id=account.id, symbol=symbol).all()
+
+    order_history_payload = []
+
+    for order in order_history_with_symbol:
+        price = get_current_price(order.symbol)
+        company_name = fetch_company_name(order.symbol)
+        unrealized = (Decimal(str(price)) - Decimal(str(order.price))) * Decimal(str(order.quantity))
+        unrealized_percentage = unrealized / (Decimal(str(order.price)) * Decimal(str(order.quantity))) * 100
+        net_value = price * order.quantity
+
+        order_history_payload.append({
+            "symbol": order.symbol,
+            "company_name": company_name,
+            "market_price": round(float(price), 2),
+            "quantity": int(order.quantity),
+            "price": float(order.price),
+            "unrealized_pnl": round(float(unrealized), 2),
+            "unrealized_pnl_percentage": round(float(unrealized_percentage), 2),
+            "net_value": round(float(net_value), 2),
+        })
+
+    return jsonify({"order_history": order_history_payload})

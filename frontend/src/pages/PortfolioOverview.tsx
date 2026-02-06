@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -52,13 +52,14 @@ const refreshAccessToken = async () => {
   return null;
 }
 
-export default function Portfolio() {
+export default function PortfolioOverview() {
   const [loading, setLoading] = useState(false);
   const [positionsPayload, setPositionsPayload] = useState<Position[] | null>(null);
   const [accountCash, setAccountCash] = useState<number | null>(null);
   const [totalInvested, setTotalInvested] = useState<number | null>(null);
   const [profitLoss, setProfitLoss] = useState<number | null>(null);
   const [portfolioValue, setPortfolioValue] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -116,7 +117,7 @@ export default function Portfolio() {
   }, []);
 
   return (
-    <div className="pt-24 pb-24">
+    <div>
       <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
         <div className="flex h-24 items-center justify-between gap-6 px-8">
           <div className="flex flex-1 items-center justify-center py-1">
@@ -131,7 +132,7 @@ export default function Portfolio() {
         </div>
       </section>
 
-      <div className="px-6 py-8">
+      <div className="py-8">
         {loading ? (
           <div className="grid gap-3 py-6">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -153,8 +154,11 @@ export default function Portfolio() {
             </TableHeader>
             <TableBody>
               {positionsPayload.map((position) => {
+                const handleClick = () => {
+                  navigate(`/portfolio/breakdown/${position.symbol}`);
+                };
                 return (
-                  <TableRow key={position.symbol}>
+                  <TableRow key={position.symbol} onClick={handleClick} className="cursor-pointer">
                     <TableCell>
                       <div className="font-semibold">{position.symbol}</div>
                       <div className="text-xs text-muted-foreground">
