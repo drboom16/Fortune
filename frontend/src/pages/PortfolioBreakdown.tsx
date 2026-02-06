@@ -83,11 +83,31 @@ export default function PortfolioBreakdown() {
   const [marketPrice, setMarketPrice] = useState<number>(0);
   const [marketPriceChange, setMarketPriceChange] = useState<number>(0);
   const [marketPriceChangePercentage, setMarketPriceChangePercentage] = useState<number>(0);
+  const [closeTradeModalActive, setCloseTradeModalActive] = useState<boolean>(false);
   
   console.log("marketStatus", marketStatus);
   const handleOrderOpen = (id: number) => {
+    const selectedOrder = orderHistory?.find((o: Order) => o.id === id) ?? null;
+    setOrder(selectedOrder);
+    
+    // Pre-populate the input fields with existing values
+    if (selectedOrder) {
+      setStopLossPrice(selectedOrder.stop_loss_price?.toString() ?? "");
+      setTakeProfitPrice(selectedOrder.take_profit_price?.toString() ?? "");
+    } else {
+      setStopLossPrice("");
+      setTakeProfitPrice("");
+    }
+    
     setOrderOpen(true);
-    setOrder(orderHistory?.find((o: Order) => o.id === id) ?? null);
+  }
+  
+  // Also clear when closing
+  const handleCloseModal = () => {
+    setOrderOpen(false);
+    setStopLossPrice("");
+    setTakeProfitPrice("");
+    setOrder(null);
   }
 
   const handleUpdateThresholds = async () => {
@@ -108,7 +128,7 @@ export default function PortfolioBreakdown() {
       })
     });
     if (!response.ok) throw new Error("Failed to update thresholds.");
-    setOrderOpen(false);
+    handleCloseModal();
   }
 
   useEffect(() => {
@@ -198,7 +218,7 @@ export default function PortfolioBreakdown() {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-background/80"
-            onClick={() => setOrderOpen(false)}
+            onClick={() => handleCloseModal()}
           />
 
           <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
@@ -213,7 +233,7 @@ export default function PortfolioBreakdown() {
               <Button
                 variant="ghost"
                 className="h-8 w-8 p-0"
-                onClick={() => setOrderOpen(false)}
+                onClick={() => handleCloseModal()}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -335,8 +355,8 @@ export default function PortfolioBreakdown() {
                 <TableHead>Asset</TableHead>
                 <TableHead className="text-right">Units</TableHead>
                 <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">SL</TableHead>
-                <TableHead className="text-right">TP</TableHead>
+                <TableHead className="text-center">SL</TableHead>
+                <TableHead className="text-center">TP</TableHead>
                 <TableHead className="text-right">Avg. Open</TableHead>
                 <TableHead className="text-right">P/L</TableHead>
                 <TableHead className="text-right">P/L(%)</TableHead>
@@ -359,11 +379,15 @@ export default function PortfolioBreakdown() {
                   <TableCell className="text-right">
                     <div className="text-sm font-medium">{order.market_price.toFixed(2)}</div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="text-sm font-medium">{order.stop_loss_price ? order.stop_loss_price.toFixed(2) : "---"}</div>
+                  <TableCell className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-8 border border-border rounded-md text-sm font-medium">
+                      {order.stop_loss_price ? order.stop_loss_price.toFixed(2) : "---"}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="text-sm font-medium">{order.take_profit_price ? order.take_profit_price.toFixed(2) : "---"}</div>
+                  <TableCell className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-8 border border-border rounded-md text-sm font-medium">
+                      {order.take_profit_price ? order.take_profit_price.toFixed(2) : "---"}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="text-sm font-medium ">${order.price.toFixed(2)}</div>
@@ -378,7 +402,17 @@ export default function PortfolioBreakdown() {
                     <div className="text-sm font-medium">${order.net_value.toFixed(2)}</div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Button className="w-24 border border-red-500 rounded-full bg-transparent text-red-500 transition-colors duration-300 ease-in-out hover:bg-red-500 hover:text-white hover:border-red-500">Close</Button>
+                    <Button 
+                      className="w-24 border border-red-500 rounded-full bg-transparent text-red-500 transition-colors duration-300 ease-in-out hover:bg-red-500 hover:text-white hover:border-red-500" 
+                      onClick={(e) => { 
+                        e.stopPropagation();
+                        const selectedOrder = orderHistory?.find((o: Order) => o.id === order.id) ?? null;
+                        setOrder(selectedOrder);
+                        setCloseTradeModalActive(true); 
+                      }}
+                    >
+                      Close
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -389,6 +423,103 @@ export default function PortfolioBreakdown() {
         )}
       </div>
 
+      {closeTradeModalActive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-background/80"
+            onClick={() => setCloseTradeModalActive(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
+            
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-semibold">Close Trade</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ID#{order?.id.toString()}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => setCloseTradeModalActive(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {(() => {
+              if (!order) return null;
+
+              return (
+                <> 
+                  <div className="mb-6 p-4 border border-border rounded-lg bg-muted/40">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="font-semibold text-base">{order.symbol}</div>
+                        <div className="text-xs text-muted-foreground">{order.company_name}</div>
+                        <div className="mt-1 text-[8px] text-muted-foreground">{marketStatus ? "Market open" : "Market closed"} • Prices by {order.exchange}, in {order.currency}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-base">${order.net_value.toFixed(2)}</div>
+                        <div className={`text-xs font-medium ${marketPriceChangePercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {marketPriceChangePercentage >= 0 ? "+" : ""}{marketPriceChangePercentage.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-6 p-4 border border-border rounded-lg space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Current value</span>
+                      <span className="font-medium">${order.net_value.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-start text-sm">
+                      <span className="text-muted-foreground">Quantity</span>
+                      <span className="font-medium">{order.quantity}</span>
+                    </div>
+                    <div className="flex justify-between items-start text-sm">
+                      <span className="text-muted-foreground">Opening Price</span>
+                      
+                      {/* Right-aligned container for Price and Date */}
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold text-foreground">
+                          ${order.price.toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(order.created_at).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })} | {new Date(order.created_at).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Return</span>
+                      <span className={`font-medium ${marketPriceChange >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {marketPriceChange >= 0 ? "$" : "-$"}{Math.abs(marketPriceChange).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      variant="ghost"
+                      className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                    >
+                      Close Trade
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
