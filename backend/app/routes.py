@@ -438,6 +438,8 @@ def portfolio_breakdown(symbol):
         net_value = price * order.quantity
 
         order_history_payload.append({
+            "id": order.id,
+            "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
             "symbol": order.symbol,
             "company_name": company_name,
             "market_price": round(float(price), 2),
@@ -446,6 +448,24 @@ def portfolio_breakdown(symbol):
             "unrealized_pnl": round(float(unrealized), 2),
             "unrealized_pnl_percentage": round(float(unrealized_percentage), 2),
             "net_value": round(float(net_value), 2),
+            "stop_loss_price": float(order.stop_loss_price) if order.stop_loss_price else None,
+            "take_profit_price": float(order.take_profit_price) if order.take_profit_price else None,
         })
 
     return jsonify({"order_history": order_history_payload})
+
+
+@api.post("/portfolio/breakdown/thresholds")
+@jwt_required()
+def set_thresholds():
+    payload = request.get_json() or {}
+    order_id = int(payload.get("id"))
+    order = Order.query.filter_by(id=order_id).first()
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+    if order.side != "BUY":
+        return jsonify({"error": "Order is not a buy order"}), 400
+    order.stop_loss_price = Decimal(str(payload.get("stop_loss_price")))
+    order.take_profit_price = Decimal(str(payload.get("take_profit_price")))
+    db.session.commit()
+    return jsonify({"message": "Thresholds set successfully"}), 200
