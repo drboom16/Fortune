@@ -142,7 +142,7 @@ export default function PortfolioOverview() {
         ) : positionsPayload && positionsPayload.length > 0 ? (
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40 h-16">
                 <TableHead>Asset</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Units</TableHead>

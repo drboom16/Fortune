@@ -487,3 +487,8 @@ def market_status():
     if not symbol:
         return jsonify({"error": "Symbol required"}), 400
     return jsonify({"market_status": is_market_open(symbol)})
+
+@api.post("/portfolio/breakdown/close-all") # TODO: consider whether the market is open/closed to execute orders
+@jwt_required()
+def close_all_trades():
+    pass
