@@ -1,8 +1,14 @@
 import pytest
+from unittest.mock import patch
+
+import sys
+from pathlib import Path
+
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
 
 from app import create_app
 from app.extensions import db
-
 
 @pytest.fixture()
 def app(monkeypatch):
@@ -22,3 +28,50 @@ def app(monkeypatch):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def authenticated_user(app, client):
+    """Create a user and return authentication tokens"""
+    with app.app_context():
+        # Register a new user
+        response = client.post('/api/auth/register', json={
+            'email': 'test@example.com',
+            'password': 'testpass123'
+        })
+        assert response.status_code == 201
+        data = response.get_json()
+        
+        return {
+            'user_id': data['user']['id'],
+            'access_token': data['access_token'],
+            'refresh_token': data['refresh_token']
+        }
+
+
+@pytest.fixture
+def mock_quote():
+    """Mock the fetch_quote function"""
+    with patch('app.routes.fetch_quote') as mock:
+        mock.return_value = {
+            'price': 150.00,
+            'exchange': 'NMS',
+            'currency': 'USD'
+        }
+        yield mock
+
+
+@pytest.fixture
+def mock_current_price():
+    """Mock the get_current_price function"""
+    with patch('app.routes.get_current_price') as mock:
+        mock.return_value = 150.00
+        yield mock
+
+
+@pytest.fixture
+def mock_company_name():
+    """Mock the fetch_company_name function"""
+    with patch('app.routes.fetch_company_name') as mock:
+        mock.return_value = 'Apple Inc.'
+        yield mock

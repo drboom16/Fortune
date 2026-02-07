@@ -68,6 +68,7 @@ class Order(db.Model):
     take_profit_price = db.Column(db.Numeric(10, 4), nullable=True) # Optional
     exchange = db.Column(db.String(16), nullable=True) # Optional
     currency = db.Column(db.String(16), nullable=True) # Optional
+    status_text = db.Column(db.String(16), nullable=True, default="OPEN")
 
     account = db.relationship("Account", back_populates="orders")
 
@@ -84,6 +85,7 @@ class Order(db.Model):
             "take_profit_price": float(self.take_profit_price) if self.take_profit_price else None,
             "exchange": self.exchange,
             "currency": self.currency,
+            "status_text": self.status_text,
         }
 
 

@@ -410,6 +410,11 @@ def sell_stock():
     if position.quantity == 0:
         db.session.delete(position)
 
+    order = Order.query.filter_by(id=data.get("id")).first()
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+    order.status_text = "CLOSED"
+
     order = Order(
         account_id=account.id,
         symbol=symbol,
@@ -417,19 +422,20 @@ def sell_stock():
         quantity=quantity,
         price=Decimal(str(current_price)),
         status="FILLED",
+        status_text="CLOSED",
     )
     db.session.add(order)
     db.session.commit()
 
     return jsonify({"order": order.to_dict(), "account": _account_summary(account)})
-
+    
 
 @api.get("/portfolio/breakdown/<symbol>")
 @jwt_required()
 def portfolio_breakdown(symbol):
     user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
-    order_history_with_symbol: list[Order] = Order.query.filter_by(account_id=account.id, symbol=symbol).all()
+    order_history_with_symbol: list[Order] = Order.query.filter_by(account_id=account.id, symbol=symbol, side="BUY", status_text="OPEN").all()
 
     order_history_payload = []
 
@@ -439,7 +445,7 @@ def portfolio_breakdown(symbol):
         unrealized = (Decimal(str(price)) - Decimal(str(order.price))) * Decimal(str(order.quantity))
         unrealized_percentage = unrealized / (Decimal(str(order.price)) * Decimal(str(order.quantity))) * 100
         net_value = price * order.quantity
-
+        
         order_history_payload.append({
             "id": order.id,
             "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
