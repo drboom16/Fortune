@@ -84,6 +84,7 @@ export default function PortfolioBreakdown() {
   const [marketPriceChange, setMarketPriceChange] = useState<number>(0);
   const [marketPriceChangePercentage, setMarketPriceChangePercentage] = useState<number>(0);
   const [closeTradeModalActive, setCloseTradeModalActive] = useState<boolean>(false);
+  const [tradeError, setTradeError] = useState<string | null>(null);
   
   console.log("marketStatus", marketStatus);
   const handleOrderOpen = (id: number) => {
@@ -109,6 +110,35 @@ export default function PortfolioBreakdown() {
     setTakeProfitPrice("");
     setOrder(null);
   }
+
+  const handleSellStock = async (id: number, symbol: string, quantity: number) => {
+    setLoading(true);
+    const token = getAccessToken();
+    if (!token) return;
+    if (!symbol || !quantity) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/sell`, {
+        method: "POST",
+        credentials: 'include',
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+          "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({ 
+          id: id,
+          symbol: symbol, 
+          quantity: quantity, 
+        })
+      });
+      if (!response.ok) throw new Error("Failed to sell stock.");
+      setCloseTradeModalActive(false);
+      setTradeError(null);
+    } catch (err) {
+      setTradeError(err instanceof Error ? err.message : "Unable to sell stock.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleUpdateThresholds = async () => {
     const token = getAccessToken();
@@ -330,6 +360,11 @@ export default function PortfolioBreakdown() {
                     <Button 
                       variant="ghost"
                       className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOrder(order);
+                        setCloseTradeModalActive(true);
+                      }}
                     >
                       Close Trade
                     </Button>
@@ -510,6 +545,10 @@ export default function PortfolioBreakdown() {
                     <Button 
                       variant="ghost"
                       className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSellStock(order.id, order.symbol, order.quantity);
+                      }}
                     >
                       Close Trade
                     </Button>
