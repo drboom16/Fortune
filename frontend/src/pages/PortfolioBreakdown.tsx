@@ -73,9 +73,9 @@ export default function PortfolioBreakdown() {
   const [marketPriceChange, setMarketPriceChange] = useState<number>(0);
   const [marketPriceChangePercentage, setMarketPriceChangePercentage] = useState<number>(0);
   const [closeTradeModalActive, setCloseTradeModalActive] = useState<boolean>(false);
+  const [closeAllTradesModalActive, setCloseAllTradesModalActive] = useState<boolean>(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
   
-  console.log("marketStatus", marketStatus);
   const handleOrderOpen = (id: number) => {
     const selectedOrder = orderHistory?.find((o: Order) => o.id === id) ?? null;
     setOrder(selectedOrder);
@@ -148,6 +148,18 @@ export default function PortfolioBreakdown() {
     });
     if (!response.ok) throw new Error("Failed to update thresholds.");
     handleCloseModal();
+  }
+
+  const handleCloseAllTrades = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    const response = await fetch(`${API_BASE_URL}/portfolio/breakdown/close-all`, {
+      method: "POST",
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error("Failed to close all trades.");
+    setCloseAllTradesModalActive(false);
   }
 
   useEffect(() => {
@@ -375,7 +387,7 @@ export default function PortfolioBreakdown() {
         ) : orderHistory && orderHistory.length > 0 ? (
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40 h-16">
                 <TableHead>Asset</TableHead>
                 <TableHead className="text-right">Units</TableHead>
                 <TableHead className="text-right">Price</TableHead>
@@ -385,7 +397,12 @@ export default function PortfolioBreakdown() {
                 <TableHead className="text-right">P/L</TableHead>
                 <TableHead className="text-right">P/L(%)</TableHead>
                 <TableHead className="text-right">Net Value</TableHead>
-                <TableHead className="text-center">Close Positions</TableHead>
+                <TableHead className="text-center">
+                  <Button className="w-30 h-8 text-black border border-black rounded-full bg-transparent transition-colors duration-300 ease-in-out hover:bg-black hover:text-white hover:border-black" onClick={(e) => {
+                    e.stopPropagation();
+                    setCloseAllTradesModalActive(true);
+                  }}>Close All</Button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -427,7 +444,7 @@ export default function PortfolioBreakdown() {
                   </TableCell>
                   <TableCell className="text-center">
                     <Button 
-                      className="w-24 border border-red-500 rounded-full bg-transparent text-red-500 transition-colors duration-300 ease-in-out hover:bg-red-500 hover:text-white hover:border-red-500" 
+                      className="w-20 h-8 border border-red-500 rounded-full bg-transparent text-red-500 transition-colors duration-300 ease-in-out hover:bg-red-500 hover:text-white hover:border-red-500" 
                       onClick={(e) => { 
                         e.stopPropagation();
                         const selectedOrder = orderHistory?.find((o: Order) => o.id === order.id) ?? null;
@@ -485,7 +502,7 @@ export default function PortfolioBreakdown() {
                         <div className="mt-1 text-[8px] text-muted-foreground">{marketStatus ? "Market open" : "Market closed"} • Prices by {order.exchange}, in {order.currency}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-base">${order.net_value.toFixed(2)}</div>
+                        <div className="font-semibold text-base">${order.market_price.toFixed(2)}</div>
                         <div className={`text-xs font-medium ${marketPriceChangePercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
                           {marketPriceChangePercentage >= 0 ? "+" : ""}{marketPriceChangePercentage.toFixed(2)}%
                         </div>
@@ -530,7 +547,8 @@ export default function PortfolioBreakdown() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-3">
+                  <div className="text-[10px] text-center text-muted-foreground">Note: Your close order will be executed once the market is open.</div>
+                  <div className="mt-6 flex flex-col gap-3">
                     <Button 
                       variant="ghost"
                       className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
@@ -545,6 +563,99 @@ export default function PortfolioBreakdown() {
                 </>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {closeAllTradesModalActive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-background/80"
+            onClick={() => setCloseAllTradesModalActive(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
+            
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-semibold">Close All Trades</h2>
+              </div>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => setCloseAllTradesModalActive(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="mb-6 p-4 border border-border rounded-lg bg-muted/40">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="font-semibold text-base">{symbol}</div>
+                  <div className="text-xs text-muted-foreground">{orderHistory?.[0]?.company_name}</div>
+                  <div className="mt-1 text-[8px] text-muted-foreground">{marketStatus ? "Market open" : "Market closed"} • Prices by {orderHistory?.[0]?.exchange}, in {orderHistory?.[0]?.currency}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-base">${marketPrice.toFixed(2)}</div>
+                  <div className={`text-xs font-medium ${marketPriceChangePercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {marketPriceChangePercentage >= 0 ? "+" : ""}{marketPriceChangePercentage.toFixed(2)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-6 p-4 border border-border rounded-lg space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Avg. Open</span>
+                <div className="flex flex-col items-end">
+                  <span className="font-semibold text-foreground">
+                    ${(orderHistory?.reduce((acc, order) => acc + order.price * order.quantity, 0) ?? 0) / (orderHistory?.reduce((acc, order) => acc + order.quantity, 0) ?? 1)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {orderHistory?.reduce((acc, order) => acc + order.quantity, 0) ?? 0} Shares
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-between items-start text-sm">
+                <span className="text-muted-foreground">Total P/L</span>
+                <div className="flex flex-col items-end">
+                  {(() => {
+                    const totalPnl = orderHistory?.reduce((acc, order) => acc + order.unrealized_pnl, 0) ?? 0;
+                    return (
+                      <>
+                        <span className={`font-semibold text-foreground ${totalPnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {totalPnl >= 0 ? "$" : "-$"}{Math.abs(totalPnl).toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {totalPnl >= 0 ? "+" : "-"} {Math.abs(totalPnl).toFixed(2)}%
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current Value</span>
+                <span className="font-medium">${(orderHistory?.reduce((acc, order) => acc + order.market_price * order.quantity, 0) ?? 0).toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <div className="text-[10px] text-center text-muted-foreground">Note: Your close order will be executed once the market is open.</div>
+            
+            <div className="mt-6 flex flex-col gap-3">
+              <Button 
+                variant="ghost"
+                className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCloseAllTrades();
+                }}
+              >
+                Close All
+              </Button>
+            </div>
+
           </div>
         </div>
       )}
