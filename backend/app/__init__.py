@@ -9,6 +9,7 @@ from .extensions import bcrypt, cors, db, jwt
 from .routes import api
 from .models import Position
 from .websocket_manager import ws_manager
+from .scheduler import init_scheduler
 
 # NOTE: if you want to utilise an asynchronous background manager within Flask
 # you need to wrap the execution in a separate thread
@@ -29,6 +30,10 @@ def create_app():
     app.register_blueprint(api)
 
     with app.app_context():
+        # Start scheduler (background worker)
+        init_scheduler(app)
+
+        # Create all tables
         db.create_all()
 
         # Get all unique symbols from the database

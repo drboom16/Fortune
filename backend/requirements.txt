@@ -8,3 +8,5 @@ python-dotenv
 requests
 yfinance
 pytest
+APScheduler
+Flask-APScheduler
