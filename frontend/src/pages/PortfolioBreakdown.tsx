@@ -7,17 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
 
-interface Position {
-  symbol: string,
-  company_name: string,
-  market_price: number,
-  quantity: number,
-  avg_price: number,
-  unrealized_pnl: number,
-  unrealized_pnl_percentage: number,
-  net_value: number;
-}
-
 interface Order {
   id: number,
   created_at: string,
