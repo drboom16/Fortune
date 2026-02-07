@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import StockSearchBar from "../components/ui/StockSearchBar";
+import { useNavigate } from "react-router-dom";
 
 type AiWatchlistItem = {
   ticker: string;
@@ -48,6 +49,7 @@ export default function Watchlist() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const navigate = useNavigate();
 
   const loadWatchlist = async () => {
     setLoading(true);
@@ -163,6 +165,10 @@ export default function Watchlist() {
     );
   };
 
+  const handleClick = (ticker: string) => {
+    navigate(`/market/${ticker}`);
+  };
+
   return (
     <div className="flex flex-col gap-8 pt-24">
       <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
@@ -176,9 +182,6 @@ export default function Watchlist() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">My Watchlist</h1>
-        </div>
-        <div className="rounded-full border border-border bg-card px-4 py-2 text-xs text-muted-foreground">
-          {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Updating..."}
         </div>
       </div>
 
@@ -208,7 +211,7 @@ export default function Watchlist() {
                   ? (quote.change_1d / quote.value) * 100
                   : 0;
                 return (
-                  <TableRow key={quote.ticker}>
+                  <TableRow key={quote.ticker} onClick={() => handleClick(quote.ticker)} className="cursor-pointer">
                     <TableCell>
                       <div className="font-semibold">{quote.ticker}</div>
                       <div className="text-xs text-muted-foreground">

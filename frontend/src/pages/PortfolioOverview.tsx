@@ -189,7 +189,7 @@ export default function PortfolioOverview() {
             </TableBody>
           </Table>
         ) : (
-          <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
             <img src="/pi-chart.png" alt="Portfolio chart" className="h-64 w-64" />
             <h2 className="mt-6 text-xl font-semibold">Your portfolio is empty</h2>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
