@@ -46,14 +46,12 @@ const refreshAccessToken = async () => {
 export default function Watchlist() {
   const [items, setItems] = useState<AiWatchlistItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const navigate = useNavigate();
 
   const loadWatchlist = async () => {
     setLoading(true);
-    setError(null);
     try {
       const token = getAccessToken();
       if (!token) {
@@ -69,7 +67,6 @@ export default function Watchlist() {
         const refreshed = await refreshAccessToken();
         if (!refreshed) {
           setItems([]);
-          setError("Please log in to view your watchlist.");
           return;
         }
         response = await fetch(`${API_BASE_URL}/market/watchlist`, {
@@ -85,7 +82,7 @@ export default function Watchlist() {
       setItems(nextItems);
       setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load watchlist.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -185,7 +182,7 @@ export default function Watchlist() {
         </div>
       </div>
 
-      <section className="rounded-2xl border border-border bg-card px-6 py-2 shadow-sm">
+      <section className="py-8 translate-y-[-32px]">
         {loading ? (
           <div className="grid gap-3 py-6">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -195,7 +192,7 @@ export default function Watchlist() {
         ) : watchlistItems.length ? (
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40 h-16">
                 <TableHead>Markets</TableHead>
                 <TableHead>Change 1D</TableHead>
                 <TableHead />
@@ -260,11 +257,14 @@ export default function Watchlist() {
             </TableBody>
           </Table>
         ) : (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            No watchlist items yet.
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
+            <img src="/price-timeseries.svg" alt="Price timeseries" className="h-60 w-60 pb-2" />
+            <h2 className="mt-6 text-xl font-semibold">Your watchlist is empty</h2>
+            <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+              Add stocks to your watchlist to see their price timeseries and get alerts when they move.
+            </p>
           </div>
         )}
-        {error ? <div className="px-2 py-4 text-sm text-rose-500">Unable to load watchlist.</div> : null}
       </section>
     </div>
   );
