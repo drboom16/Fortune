@@ -333,31 +333,39 @@ def create_order():
     price = Decimal(str(quote["price"]))
     order_cost = price * Decimal(quantity)
 
-    position = account.positions.filter_by(symbol=symbol).first()
+    market_open = is_market_open(symbol)
+    status = "FILLED" if market_open else "PENDING"
+
     if side == "BUY":
         if account.cash_balance < order_cost:
             return jsonify({"error": "Insufficient cash"}), 400
-        account.cash_balance -= order_cost
-        if position:
-            total_shares = position.quantity + quantity
-            total_cost = (Decimal(position.avg_price) * Decimal(position.quantity)) + order_cost
-            position.avg_price = total_cost / Decimal(total_shares)
-            position.quantity = total_shares
-        else:
-            position = Position(
-                account_id=account.id,
-                symbol=symbol,
-                quantity=quantity,
-                avg_price=price,
-            )
-            db.session.add(position)
     else:
+        position = account.positions.filter_by(symbol=symbol).first()
         if not position or position.quantity < quantity:
             return jsonify({"error": "Insufficient shares"}), 400
-        account.cash_balance += order_cost
-        position.quantity -= quantity
-        if position.quantity == 0:
-            db.session.delete(position)
+
+    if market_open:
+        position = account.positions.filter_by(symbol=symbol).first()
+        if side == "BUY":
+            account.cash_balance -= order_cost
+            if position:
+                total_shares = position.quantity + quantity
+                total_cost = (Decimal(position.avg_price) * Decimal(position.quantity)) + order_cost
+                position.avg_price = total_cost / Decimal(total_shares)
+                position.quantity = total_shares
+            else:
+                position = Position(
+                    account_id=account.id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    avg_price=price,
+                )
+                db.session.add(position)
+        else:  # SELL
+            account.cash_balance += order_cost
+            position.quantity -= quantity
+            if position.quantity == 0:
+                db.session.delete(position)
 
     order = Order(
         account_id=account.id,
@@ -365,7 +373,7 @@ def create_order():
         side=side,
         quantity=quantity,
         price=price,
-        status="FILLED",
+        status=status,
         exchange=quote.get("exchange", ""),
         currency=quote.get("currency", ""),
     )
