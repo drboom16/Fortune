@@ -14,13 +14,17 @@ from .scheduler import init_scheduler
 # NOTE: if you want to utilise an asynchronous background manager within Flask
 # you need to wrap the execution in a separate thread
 
-def create_app():
+def create_app(config=None):  # ← Add config parameter
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
         "DATABASE_URL", "sqlite:///paper_trader.db"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "change-me")
+
+    # Apply config overrides BEFORE initializing extensions
+    if config:
+        app.config.update(config)
 
     db.init_app(app)
     jwt.init_app(app)
@@ -30,9 +34,6 @@ def create_app():
     app.register_blueprint(api)
 
     with app.app_context():
-        # Start scheduler (background worker)
-        init_scheduler(app)
-
         # Create all tables
         db.create_all()
 
@@ -51,5 +52,9 @@ def create_app():
             thread.start()
 
             print(f"Started WebSocket for {len(symbol_list)} symbols: {symbol_list}")
+
+    # Only start scheduler if NOT in testing mode
+    if not app.config.get("TESTING", False):
+        init_scheduler(app)
 
     return app

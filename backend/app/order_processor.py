@@ -3,12 +3,12 @@ from app.extensions import db
 from app.models import Order, Position, Account
 from app.market_data import is_market_open, fetch_quote
 
-
 def process_pending_orders():
     """
-    Process all PENDING orders for symbols where market is open.
+    Process all PENDING orders for symbols where market is now open.
     Run this periodically (e.g., every minute via scheduler).
     """
+
     pending_orders = Order.query.filter_by(status="PENDING").all()
     
     processed_count = 0
@@ -42,6 +42,7 @@ def process_pending_orders():
                 account.cash_balance -= order_cost
                 
                 if position:
+                    print(f"DEBUG: Position found for order {order.id}")
                     total_shares = position.quantity + order.quantity
                     total_cost = (Decimal(position.avg_price) * Decimal(position.quantity)) + order_cost
                     position.avg_price = total_cost / Decimal(total_shares)
@@ -54,6 +55,10 @@ def process_pending_orders():
                         avg_price=current_price,
                     )
                     db.session.add(position)
+                
+                order.status = "FILLED"
+                order.price = current_price
+                order.status_text = "OPEN"
             
             else:  # SELL
                 if not position or position.quantity < order.quantity:
@@ -67,10 +72,28 @@ def process_pending_orders():
                 
                 if position.quantity == 0:
                     db.session.delete(position)
-            
-            order.status = "FILLED"
-            order.price = current_price
-            order.status_text = "OPEN"
+                
+                # Find and mark the original buy order as closed
+                buy_orders = Order.query.filter_by(
+                    account_id=account.id,
+                    symbol=order.symbol,
+                    side="BUY",
+                    status_text="OPEN"
+                ).all()
+                
+                remaining_qty = order.quantity
+                for buy_order in buy_orders:
+                    if remaining_qty <= 0:
+                        break
+                    if buy_order.quantity <= remaining_qty:
+                        buy_order.status_text = "CLOSED"
+                        remaining_qty -= buy_order.quantity
+                    else:
+                        break
+                
+                order.status = "FILLED"
+                order.price = current_price
+                order.status_text = "CLOSED"
             
             db.session.commit()
             processed_count += 1

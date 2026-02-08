@@ -391,6 +391,7 @@ def orders():
     orders_payload = [order.to_dict() for order in account.orders.order_by(Order.id.desc())]
     return jsonify({"orders": orders_payload})
 
+
 @api.post("/sell")
 @jwt_required()
 def sell_stock():
@@ -400,6 +401,9 @@ def sell_stock():
     symbol = data.get("symbol", "").upper()
     quantity = data.get("quantity")
 
+    # Check if market is open
+    market_open = is_market_open(symbol)
+    
     # Get reliable current price for the sale
     current_price = get_current_price(symbol)
 
@@ -410,40 +414,61 @@ def sell_stock():
 
     account = _get_account_for_user(user_id)
     position = account.positions.filter_by(symbol=symbol).first()
+    
+    # Validate shares are available
     if not position or position.quantity < quantity:
         return jsonify({"error": "Insufficient shares"}), 400
 
-    account.cash_balance += sale_value
-    position.quantity -= quantity
-    if position.quantity == 0:
-        db.session.delete(position)
-
-    order = Order.query.filter_by(id=data.get("id")).first()
-    if not order:
+    # Get the original buy order to mark as closed
+    original_order = Order.query.filter_by(id=data.get("id")).first()
+    if not original_order:
         return jsonify({"error": "Order not found"}), 404
-    order.status_text = "CLOSED"
 
-    order = Order(
+    # Determine order status based on market hours
+    status = "FILLED" if market_open else "PENDING"
+
+    # Only execute the sale if market is open
+    if market_open:
+        account.cash_balance += sale_value
+        position.quantity -= quantity
+        if position.quantity == 0:
+            db.session.delete(position)
+        
+        # Mark original buy order as closed
+        original_order.status_text = "CLOSED"
+
+    # Create sell order record (regardless of market status)
+    sell_order = Order(
         account_id=account.id,
         symbol=symbol,
         side="SELL",
         quantity=quantity,
         price=Decimal(str(current_price)),
-        status="FILLED",
-        status_text="CLOSED",
+        status=status,
+        status_text="CLOSED" if market_open else "PENDING_CLOSE",
+        exchange=original_order.exchange,  # Inherit from original order
+        currency=original_order.currency,  # Inherit from original order
     )
-    db.session.add(order)
+    db.session.add(sell_order)
     db.session.commit()
 
-    return jsonify({"order": order.to_dict(), "account": _account_summary(account)})
+    response_message = {
+        "order": sell_order.to_dict(), 
+        "account": _account_summary(account)
+    }
     
+    if not market_open:
+        response_message["message"] = "Order queued. Will execute when market opens."
+
+    return jsonify(response_message)
+
 
 @api.get("/portfolio/breakdown/<symbol>")
 @jwt_required()
 def portfolio_breakdown(symbol):
     user_id = int(get_jwt_identity())
     account = _get_account_for_user(user_id)
-    order_history_with_symbol: list[Order] = Order.query.filter_by(account_id=account.id, symbol=symbol, side="BUY", status_text="OPEN").all()
+    order_history_with_symbol: list[Order] = Order.query.filter_by(account_id=account.id, symbol=symbol, side="BUY", status_text="OPEN", status="FILLED").all()
 
     order_history_payload = []
 
