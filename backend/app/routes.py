@@ -521,6 +521,38 @@ def market_status():
         return jsonify({"error": "Symbol required"}), 400
     return jsonify({"market_status": is_market_open(symbol)})
 
+
+@api.get("/chart/<symbol>")
+def get_chart(symbol):
+    """Get historical price data for charting"""
+    period = request.args.get('period', '1mo') 
+    interval = request.args.get('interval', '1d') 
+    
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period=period, interval=interval)
+        
+        chart_data = []
+        for timestamp, row in hist.iterrows():
+            chart_data.append({
+                'time': int(timestamp.timestamp()),  # Unix timestamp
+                'open': float(row['Open']),
+                'high': float(row['High']),
+                'low': float(row['Low']),
+                'close': float(row['Close']),
+                'volume': int(row['Volume'])
+            })
+        
+        return jsonify({
+            'symbol': symbol,
+            'period': period,
+            'interval': interval,
+            'data': chart_data
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @api.post("/portfolio/breakdown/close-all") # TODO: consider whether the market is open/closed to execute orders
 @jwt_required()
 def close_all_trades():

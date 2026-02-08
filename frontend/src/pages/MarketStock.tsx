@@ -2,74 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import StockSearchBar from "../components/ui/StockSearchBar";
-
-type AiCompanyPayload = {
-  ticker?: string;
-  company_name?: string;
-  market_status?: string;
-  quote?: {
-    current_price?: number;
-    currency?: string;
-    change_absolute?: number;
-    change_percentage?: number;
-    trading_mode?: string;
-  };
-  performance_metrics?: {
-    past_week_growth?: string;
-    market_cap?: string;
-    volume_3m_avg?: string;
-    pe_ratio?: number;
-    revenue_ttm?: string;
-    day_range?: {
-      low?: number;
-      high?: number;
-    };
-    "52w_range"?: {
-      low?: number;
-      high?: number;
-    };
-  };
-  upcoming_events?: {
-    event_type?: string;
-    fiscal_period?: string;
-    date?: string;
-    timing?: string;
-  };
-  analyst_forecast?: {
-    consensus?: string;
-    price_target?: number;
-    analyst_count?: number;
-  };
-  related_content?: {
-    people_also_bought?: string[];
-  };
-  metadata?: {
-    source_screenshot_date?: string;
-    primary_exchange?: string;
-  };
-  profile?: {
-    sector?: string;
-    industry?: string;
-    ceo?: string;
-    employees?: number;
-  };
-  financials?: {
-    prev_close?: number;
-    eps?: number;
-    one_year_return?: string;
-    dividend_yield?: string;
-    beta?: number;
-    market_cap?: string;
-    day_range?: string;
-    year_range?: string;
-    volume_3m?: string;
-    revenue?: string;
-  };
-  latest_news?: Array<{ title: string; source: string; time: string }>;
-  related_companies?: Array<{ ticker: string; name: string; change: string }>;
-};
+import StockChart from "../components/ui/Chart";
+import { 
+  MOCK_AAPL_DATA, 
+  MOCK_AAPL_CHART_DATA, 
+  MOCK_AAPL_CHART_DATA_BY_PERIOD,
+  type AiCompanyPayload, 
+  type ChartData 
+} from "../data/Mockdata";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
 const getAccessToken = () => {
   const token = localStorage.getItem("access_token");
   if (!token || token === "null" || token === "undefined") {
@@ -107,83 +50,12 @@ const metricLabels: Array<{ key: keyof NonNullable<AiCompanyPayload["performance
   { key: "revenue_ttm", label: "Revenue (TTM)" }
 ];
 
-const MOCK_AAPL: AiCompanyPayload = {
-  ticker: "AAPL",
-  company_name: "Apple Inc.",
-  market_status: "Market Open",
-  quote: {
-    current_price: 191.24,
-    currency: "USD",
-    change_absolute: 1.18,
-    change_percentage: 0.62,
-    trading_mode: "24/5 Trading"
-  },
-  performance_metrics: {
-    past_week_growth: "+2.14%",
-    market_cap: "2.98T",
-    volume_3m_avg: "58.21M",
-    pe_ratio: 28.41,
-    revenue_ttm: "382.49B",
-    day_range: { low: 188.72, high: 192.84 },
-    "52w_range": { low: 164.08, high: 199.62 }
-  },
-  upcoming_events: {
-    event_type: "Earnings Report",
-    fiscal_period: "Q1 2026",
-    date: "2026-02-28",
-    timing: "After Market Close"
-  },
-  analyst_forecast: {
-    consensus: "Moderate Buy",
-    price_target: 214.35,
-    analyst_count: 41
-  },
-  related_content: {
-    people_also_bought: ["Microsoft", "Alphabet Class A", "NVIDIA", "Amazon", "Meta"]
-  },
-  metadata: {
-    source_screenshot_date: "2026-02-02",
-    primary_exchange: "NASDAQ"
-  },
-  profile: {
-    sector: "Technology",
-    industry: "Consumer Electronics",
-    ceo: "Tim Cook",
-    employees: 161000
-  },
-  financials: {
-    prev_close: 190.06,
-    eps: 6.42,
-    one_year_return: "+18.6%",
-    dividend_yield: "0.52% (0.96)",
-    beta: 1.25,
-    market_cap: "2.98T",
-    day_range: "188.72 - 192.84",
-    year_range: "164.08 - 199.62",
-    volume_3m: "58.21M",
-    revenue: "382.49B"
-  },
-  latest_news: [
-    { title: "Apple unveils new AI tools for creators", source: "Reuters", time: "2h ago" },
-    { title: "iPhone demand stays resilient in Q1", source: "Bloomberg", time: "6h ago" },
-    { title: "Apple services revenue hits record", source: "WSJ", time: "1d ago" }
-  ],
-  related_companies: [
-    { ticker: "GOOG", name: "Alphabet", change: "-2.36%" },
-    { ticker: "MSFT", name: "Microsoft", change: "-1.78%" },
-    { ticker: "AMZN", name: "Amazon", change: "-1.80%" },
-    { ticker: "NKE", name: "Nike", change: "-1.44%" },
-    { ticker: "TSLA", name: "Tesla", change: "-2.70%" }
-  ]
-};
-
 type WatchlistItem = {
   ticker?: string;
 };
 
 export default function MarketStock() {
   const { symbol } = useParams<{ symbol: string }>();
-  const navigate = useNavigate();
   const [data, setData] = useState<AiCompanyPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -199,6 +71,8 @@ export default function MarketStock() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [orderBusy, setOrderBusy] = useState(false);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [chartPeriod, setChartPeriod] = useState("1mo");
 
   const normalizedSymbol = (symbol ?? "").trim().toUpperCase();
 
@@ -211,6 +85,40 @@ export default function MarketStock() {
     return `${intPart}.${decPart.slice(0, maxDecimals)}`;
   };
 
+  const loadChartData = async (period: string) => {
+    if (!normalizedSymbol) return;
+    
+    if (normalizedSymbol === "AAPL") {
+      // Use period-specific mock data
+      const mockData = MOCK_AAPL_CHART_DATA_BY_PERIOD[period as keyof typeof MOCK_AAPL_CHART_DATA_BY_PERIOD];
+      setChartData(mockData || MOCK_AAPL_CHART_DATA);
+      return;
+    }
+
+    try {
+      const periodMap: Record<string, { period: string; interval: string }> = {
+        "1d": { period: "1d", interval: "5m" },
+        "5d": { period: "5d", interval: "30m" },
+        "1mo": { period: "1mo", interval: "1d" },
+        "3mo": { period: "3mo", interval: "1d" },
+        "1y": { period: "1y", interval: "1d" },
+        "5y": { period: "5y", interval: "1wk" },
+      };
+
+      const { period: apiPeriod, interval } = periodMap[period] || periodMap["1mo"];
+      const chartResponse = await fetch(
+        `${API_BASE_URL}/chart/${normalizedSymbol}?period=${apiPeriod}&interval=${interval}`
+      );
+      
+      if (chartResponse.ok) {
+        const chartPayload = (await chartResponse.json()) as { data?: ChartData[] };
+        setChartData(chartPayload.data ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to load chart data:", err);
+    }
+  };
+
   useEffect(() => {
     if (!normalizedSymbol) {
       setError("No symbol provided.");
@@ -220,7 +128,8 @@ export default function MarketStock() {
       setLoading(true);
       setError(null);
       const timeout = setTimeout(() => {
-        setData(MOCK_AAPL);
+        setData(MOCK_AAPL_DATA);
+        setChartData(MOCK_AAPL_CHART_DATA);
         setLoading(false);
       }, 500);
       return () => clearTimeout(timeout);
@@ -229,14 +138,20 @@ export default function MarketStock() {
       setLoading(true);
       setError(null);
       try {
+        // Load company data
         const response = await fetch(`${API_BASE_URL}/market/${normalizedSymbol}`);
         if (!response.ok) {
           throw new Error("Failed to load company data.");
         }
+
         const payload = (await response.json()) as { data?: AiCompanyPayload };
         setData(payload.data ?? null);
+
+        // Load chart data
+        await loadChartData(chartPeriod);
+
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to load company data.");
+        setError(err instanceof Error ? err.message : "Unable to load company data or chart data.");
       } finally {
         setLoading(false);
       }
@@ -286,6 +201,11 @@ export default function MarketStock() {
     };
     void loadStatus();
   }, [normalizedSymbol]);
+
+  const handleChartPeriodChange = (period: string) => {
+    setChartPeriod(period);
+    void loadChartData(period);
+  };
 
   const ensureAccessToken = async () => {
     const token = getAccessToken();
@@ -704,6 +624,15 @@ export default function MarketStock() {
         <div className="text-sm text-muted-foreground">No company data found.</div>
       ) : (
         <>
+          {/* Chart Section - Placed prominently at the top */}
+          <section className="flex flex-col gap-4">
+            <StockChart 
+              data={chartData} 
+              symbol={normalizedSymbol}
+              onPeriodChange={handleChartPeriodChange}
+            />
+          </section>
+
           {(() => {
             const quote = data.quote ?? {};
             const upcoming = data.upcoming_events ?? {};
@@ -715,12 +644,7 @@ export default function MarketStock() {
                 <section className="flex flex-col gap-4">
                   <div className="rounded-2xl border border-border bg-card p-6">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-semibold">Price Performance</h2>
-                      <button className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
-                        Full Trading View
-                      </button>
                     </div>
-                    <div className="mt-4 h-56 rounded-xl bg-muted/60" />
                     <div className="mt-6 grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
                       {metrics.length ? (
                         metrics.map((item) => (
