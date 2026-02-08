@@ -13,9 +13,11 @@ from app.extensions import db
 @pytest.fixture()
 def app(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite://")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
-    app = create_app()
-    app.config.update(TESTING=True)
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-with-minimum-32-chars-for-security")
+    
+    # Pass TESTING=True during creation, not after
+    app = create_app(config={'TESTING': True})  # ← Changed this line
+    
     with app.app_context():
         db.drop_all()
         db.create_all()
@@ -51,14 +53,16 @@ def authenticated_user(app, client):
 
 @pytest.fixture
 def mock_quote():
-    """Mock the fetch_quote function"""
-    with patch('app.routes.fetch_quote') as mock:
-        mock.return_value = {
-            'price': 150.00,
-            'exchange': 'NMS',
-            'currency': 'USD'
-        }
-        yield mock
+    """Mock fetch_quote in routes and processor"""
+    with patch('app.market_data.fetch_quote') as mock:
+        with patch('app.order_processor.fetch_quote', new=mock):
+            with patch('app.routes.fetch_quote', new=mock):
+                mock.return_value = {
+                    'price': 150.00,
+                    'exchange': 'NMS',
+                    'currency': 'USD'
+                }
+                yield mock
 
 
 @pytest.fixture
@@ -75,3 +79,15 @@ def mock_company_name():
     with patch('app.routes.fetch_company_name') as mock:
         mock.return_value = 'Apple Inc.'
         yield mock
+
+
+@pytest.fixture
+def mock_market_open():
+    """Mock is_market_open across the entire app surface area"""
+    with patch('app.market_data.is_market_open') as mock:
+        # Patch the processor (background jobs)
+        with patch('app.order_processor.is_market_open', new=mock):
+            # Patch the routes (API endpoints for instant fill)
+            with patch('app.routes.is_market_open', new=mock):
+                mock.return_value = True
+                yield mock
