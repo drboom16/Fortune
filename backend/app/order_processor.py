@@ -42,7 +42,6 @@ def process_pending_orders():
                 account.cash_balance -= order_cost
                 
                 if position:
-                    print(f"DEBUG: Position found for order {order.id}")
                     total_shares = position.quantity + order.quantity
                     total_cost = (Decimal(position.avg_price) * Decimal(position.quantity)) + order_cost
                     position.avg_price = total_cost / Decimal(total_shares)
