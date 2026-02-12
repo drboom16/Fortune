@@ -383,6 +383,23 @@ def create_order():
     return jsonify({"order": order.to_dict(), "account": _account_summary(account)})
 
 
+@api.get("/orders/pending")
+@jwt_required()
+def pending_orders():
+    user_id = int(get_jwt_identity())
+    account = _get_account_for_user(user_id)
+    pending = [
+        order for order in account.orders.order_by(Order.id.desc())
+        if order.status == "PENDING"
+    ]
+    orders_payload = []
+    for order in pending:
+        d = order.to_dict()
+        d["company_name"] = fetch_company_name(order.symbol)
+        orders_payload.append(d)
+    return jsonify({"orders": orders_payload})
+
+
 @api.get("/orders")
 @jwt_required()
 def orders():
@@ -553,7 +570,59 @@ def get_chart(symbol):
         return jsonify({'error': str(e)}), 500
 
 
-@api.post("/portfolio/breakdown/close-all") # TODO: consider whether the market is open/closed to execute orders
+@api.post("/portfolio/breakdown/close-all")
 @jwt_required()
 def close_all_trades():
-    pass
+    user_id = int(get_jwt_identity())
+    data = request.get_json() or {}
+    symbol = data.get("symbol", "").upper()
+    account = _get_account_for_user(user_id)
+
+    sell_orders = Order.query.filter_by(account_id=account.id, symbol=symbol, side="BUY", status_text="OPEN", status="FILLED").all()
+
+    # Create sell orders
+    for sell_order in sell_orders:
+        new_sell_order = Order(
+            account_id=account.id,
+            symbol=symbol,
+            side="SELL",
+            quantity=sell_order.quantity,
+            price=sell_order.price,
+            status="PENDING",
+            status_text="PENDING_CLOSE",
+            exchange=sell_order.exchange,
+            currency=sell_order.currency,
+        )
+        db.session.add(new_sell_order)
+        db.session.commit()
+
+    # Process sell orders
+    market_open = is_market_open(symbol)
+
+    # Get reliable current price for the sale
+    current_price = get_current_price(symbol)
+
+    if current_price <= 0:
+        return jsonify({"error": "Failed to get current price"}), 400
+
+    total_quantity = sum(sell_order.quantity for sell_order in sell_orders)
+    sale_value = Decimal(str(current_price)) * Decimal(str(total_quantity))
+
+    position = account.positions.filter_by(symbol=symbol).first()
+    if not position or position.quantity < total_quantity:
+        return jsonify({"error": "Insufficient shares"}), 400
+
+    if market_open:
+        account.cash_balance += sale_value
+        position.quantity -= total_quantity
+        if position.quantity == 0:
+            db.session.delete(position)
+
+        # Get the original buy orders to mark as closed
+        original_buy_orders = Order.query.filter_by(account_id=account.id, symbol=symbol, side="BUY", status_text="OPEN", status="FILLED").all()
+        for original_buy_order in original_buy_orders:
+            original_buy_order.status_text = "CLOSED"
+            original_buy_order.status = "FILLED"
+            db.session.commit()
+
+    return jsonify({"message": "Sell orders created successfully", "account": _account_summary(account)})

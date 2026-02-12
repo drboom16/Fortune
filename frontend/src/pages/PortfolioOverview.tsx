@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import StockSearchBar from "../components/ui/StockSearchBar";
+import { Button } from "../components/ui/button";
 
 interface Position {
   symbol: string,
@@ -15,6 +15,18 @@ interface Position {
   unrealized_pnl: number,
   unrealized_pnl_percentage: number,
   net_value: number;
+}
+
+interface PendingOrder {
+  id: number;
+  symbol: string;
+  company_name?: string;
+  side: string;
+  quantity: number;
+  price: number;
+  status: string;
+  status_text: string | null;
+  created_at: string;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -52,9 +64,14 @@ const refreshAccessToken = async () => {
   return null;
 }
 
+type ViewMode = "positions" | "pending";
+
 export default function PortfolioOverview() {
   const [loading, setLoading] = useState(false);
   const [positionsPayload, setPositionsPayload] = useState<Position[] | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[] | null>(null);
+  const [pendingOrdersLoading, setPendingOrdersLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("positions");
   const [accountCash, setAccountCash] = useState<number | null>(null);
   const [totalInvested, setTotalInvested] = useState<number | null>(null);
   const [profitLoss, setProfitLoss] = useState<number | null>(null);
@@ -116,6 +133,43 @@ export default function PortfolioOverview() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (viewMode !== "pending") return;
+
+    const loadPendingOrders = async () => {
+      setPendingOrdersLoading(true);
+      try {
+        const token = getAccessToken();
+        if (!token) return;
+
+        let response = await fetch(`${API_BASE_URL}/orders/pending`, {
+          credentials: "include",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.status === 401 || response.status === 422) {
+          const refreshed = await refreshAccessToken();
+          if (!refreshed) return;
+          response = await fetch(`${API_BASE_URL}/orders/pending`, {
+            credentials: "include",
+            headers: { Authorization: `Bearer ${refreshed}` },
+          });
+        }
+
+        if (!response.ok) throw new Error("Failed to load pending orders.");
+        const payload = (await response.json()) as { orders: PendingOrder[] };
+        setPendingOrders(Array.isArray(payload.orders) ? payload.orders : []);
+      } catch (error) {
+        console.error(error);
+        setPendingOrders([]);
+      } finally {
+        setPendingOrdersLoading(false);
+      }
+    };
+
+    loadPendingOrders();
+  }, [viewMode]);
+
   return (
     <div>
       <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
@@ -126,77 +180,166 @@ export default function PortfolioOverview() {
         </div>
       </header>
 
-      <section className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">My Portfolio</h1>
+      <section className="flex flex-col gap-4">
+        <h1 className="text-2xl font-semibold">My Portfolio</h1>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "positions" ? "default" : "secondary"}
+            size="sm"
+            onClick={() => setViewMode("positions")}
+            className={viewMode === "positions" ? "bg-black text-white hover:bg-black/90" : ""}
+          >
+            All positions
+          </Button>
+          <Button
+            variant={viewMode === "pending" ? "default" : "secondary"}
+            size="sm"
+            onClick={() => setViewMode("pending")}
+            className={viewMode === "pending" ? "bg-black text-white hover:bg-black/90" : ""}
+          >
+            Pending orders
+          </Button>
         </div>
       </section>
 
       <div className="py-8">
-        {loading ? (
-          <div className="grid gap-3 py-6">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full" />
-            ))}
-          </div>
-        ) : positionsPayload && positionsPayload.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 h-16">
-                <TableHead>Asset</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Units</TableHead>
-                <TableHead className="text-right">Avg. Open</TableHead>
-                <TableHead className="text-right">P/L</TableHead>
-                <TableHead className="text-right">P/L(%)</TableHead>
-                <TableHead className="text-right">Net Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {positionsPayload.map((position) => {
-                const handleClick = () => {
-                  navigate(`/portfolio/breakdown/${position.symbol}`);
-                };
-                return (
-                  <TableRow key={position.symbol} onClick={handleClick} className="cursor-pointer">
-                    <TableCell>
-                      <div className="font-semibold">{position.symbol}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {position.company_name}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="text-sm font-medium">{position.market_price.toFixed(2)}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="text-sm font-medium">{position.quantity}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="text-sm font-medium">{position.avg_price.toFixed(2)}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className={`text-sm font-medium ${position.unrealized_pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{position.unrealized_pnl >= 0 ? "$" : "-$"}{Math.abs(position.unrealized_pnl).toFixed(2)}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className={`text-sm font-medium ${position.unrealized_pnl_percentage >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{position.unrealized_pnl_percentage.toFixed(2)}%</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="text-sm font-medium">${position.net_value.toFixed(2)}</div>
-                    </TableCell>
+        {viewMode === "positions" ? (
+          <>
+            {loading ? (
+              <div className="grid gap-3 py-6">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <Skeleton key={index} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : positionsPayload && positionsPayload.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 h-16">
+                    <TableHead>Asset</TableHead>
+                    <TableHead className="text-center">Price</TableHead>
+                    <TableHead className="text-center">Units</TableHead>
+                    <TableHead className="text-center">Avg. Open</TableHead>
+                    <TableHead className="text-center">P/L</TableHead>
+                    <TableHead className="text-center">P/L(%)</TableHead>
+                    <TableHead className="text-right">Net Value</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {positionsPayload.map((position) => {
+                    const handleClick = () => {
+                      navigate(`/portfolio/breakdown/${position.symbol}`);
+                    };
+                    return (
+                      <TableRow key={position.symbol} onClick={handleClick} className="cursor-pointer">
+                        <TableCell>
+                          <div className="font-semibold">{position.symbol}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {position.company_name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="text-sm font-medium">{position.market_price.toFixed(2)}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="text-sm font-medium">{position.quantity}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="text-sm font-medium">{position.avg_price.toFixed(2)}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className={`text-sm font-medium ${position.unrealized_pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{position.unrealized_pnl >= 0 ? "$" : "-$"}{Math.abs(position.unrealized_pnl).toFixed(2)}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className={`text-sm font-medium ${position.unrealized_pnl_percentage >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{position.unrealized_pnl_percentage.toFixed(2)}%</div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-sm font-medium">${position.net_value.toFixed(2)}</div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
+                <img src="/pi-chart.png" alt="Portfolio chart" className="h-64 w-64" />
+                <h2 className="mt-6 text-xl font-semibold">Your portfolio is empty</h2>
+                <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+                  Start exploring investment opportunities by copying people and investing in markets or
+                  SmartPortfolios.
+                </p>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
-            <img src="/pi-chart.png" alt="Portfolio chart" className="h-64 w-64" />
-            <h2 className="mt-6 text-xl font-semibold">Your portfolio is empty</h2>
-            <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              Start exploring investment opportunities by copying people and investing in markets or
-              SmartPortfolios.
-            </p>
-          </div>
+          <>
+            {pendingOrdersLoading ? (
+              <div className="grid gap-3 py-6">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <Skeleton key={index} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : pendingOrders && pendingOrders.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 h-16">
+                    <TableHead>Asset</TableHead>
+                    <TableHead className="text-center">Side</TableHead>
+                    <TableHead className="text-center">Quantity</TableHead>
+                    <TableHead className="text-center">Price</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Order Entry Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell>
+                        <div className="font-semibold">{order.symbol}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {order.company_name ?? order.symbol}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className={`text-sm font-medium ${order.side === "BUY" ? "text-emerald-500" : "text-rose-500"}`}>
+                          {order.side}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="text-sm font-medium">{order.quantity}</div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="text-sm font-medium">${order.price.toFixed(2)}</div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="text-sm font-medium">{order.status}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          {new Date(order.created_at).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          })}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
+                <img src="/pi-chart.png" alt="Portfolio chart" className="h-64 w-64" />
+                <h2 className="mt-6 text-xl font-semibold">No pending orders</h2>
+                <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+                  Orders placed when the market is closed will appear here until they are executed.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 

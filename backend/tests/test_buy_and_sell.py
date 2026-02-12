@@ -343,6 +343,129 @@ class TestOrderProcessor:
             assert order.status == 'REJECTED'
             assert 'Insufficient cash' in order.status_text
 
+    def test_process_close_all_orders(self, app, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
+        """Test that when close all orders are called, all open orders are closed"""
+        from app.models import Position
+        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
+        
+        # Create three orders when market is open
+        mock_market_open.return_value = True
+        client.post('/api/orders', json={
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'quantity': 100
+        }, headers=headers)
+        client.post('/api/orders', json={
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'quantity': 50
+        }, headers=headers)
+        client.post('/api/orders', json={
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'quantity': 25
+        }, headers=headers)
+
+        with app.app_context():
+            position = db.session.execute(
+                db.select(Position).filter_by(symbol='AAPL')
+            ).scalar_one()
+            assert position.quantity == 175
+
+        # Close all orders
+        response = client.post('/api/portfolio/breakdown/close-all', json={
+            'symbol': 'AAPL'
+        }, headers=headers)
+        
+        assert response.status_code == 200
+        
+        # Position should not exist for AAPL anymore
+        with app.app_context():
+            position = db.session.execute(
+                db.select(Position).filter_by(symbol='AAPL')
+            ).scalar_one_or_none()
+            assert position is None
+
+    def test_process_close_all_orders_when_market_is_closed(self, app, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
+        """Test that when close all orders are called, all open orders are closed"""
+        from app.models import Order
+        from app.order_processor import process_pending_orders
+        
+        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
+        
+        # Create three orders when market is closed
+        mock_market_open.return_value = False
+        client.post('/api/orders', json={
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'quantity': 100
+        }, headers=headers)
+        client.post('/api/orders', json={
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'quantity': 50
+        }, headers=headers)
+        client.post('/api/orders', json={
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'quantity': 25
+        }, headers=headers)
+
+        with app.app_context():
+            orders = db.session.execute(
+                db.select(Order).filter_by(symbol='AAPL', side='BUY', status_text='OPEN', status='PENDING')
+            ).scalars().all()
+            assert len(orders) == 3
+
+        # Market opens
+        mock_market_open.return_value = True
+
+        # Run processor
+        with app.app_context():
+            processed = process_pending_orders()
+            assert processed == 3
+            
+            # Verify orders are now FILLED
+            orders = db.session.execute(
+                db.select(Order).filter_by(symbol='AAPL', side='BUY', status_text='OPEN', status='FILLED')
+            ).scalars().all()
+            assert len(orders) == 3
+
+        # Market closes
+        mock_market_open.return_value = False
+
+        # Close AAPL position (close all orders)
+        response = client.post('/api/portfolio/breakdown/close-all', json={
+            'symbol': 'AAPL'
+        }, headers=headers)
+
+        assert response.status_code == 200
+
+        # Creates three AAPL sell orders
+        with app.app_context():
+            orders = db.session.execute(
+                db.select(Order).filter_by(symbol='AAPL', side='SELL', status_text='PENDING_CLOSE', status='PENDING')
+            ).scalars().all()
+            assert len(orders) == 3
+
+        # Market opens
+        mock_market_open.return_value = True
+
+        # Verify orders are now FILLED
+        with app.app_context():
+            processed = process_pending_orders()
+            assert processed == 3
+
+            orders = db.session.execute(
+                db.select(Order).filter_by(symbol='AAPL', side='SELL', status='FILLED')
+            ).scalars().all()
+            assert len(orders) == 3
+
+            orders = db.session.execute(
+                db.select(Order).filter_by(symbol='AAPL', side='BUY', status_text='CLOSED', status='FILLED')
+            ).scalars().all()
+            assert len(orders) == 3
+
 
 class TestPortfolioBreakdown:
     """Test cases for portfolio breakdown"""

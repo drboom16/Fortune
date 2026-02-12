@@ -156,7 +156,13 @@ export default function PortfolioBreakdown() {
     const response = await fetch(`${API_BASE_URL}/portfolio/breakdown/close-all`, {
       method: "POST",
       credentials: 'include',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { 
+        Authorization: `Bearer ${token}`, 
+        "Content-Type": "application/json" 
+      },
+      body: JSON.stringify({ 
+        symbol: symbol
+      })
     });
     if (!response.ok) throw new Error("Failed to close all trades.");
     setCloseAllTradesModalActive(false);
@@ -624,10 +630,10 @@ export default function PortfolioBreakdown() {
                     const totalPnl = orderHistory?.reduce((acc, order) => acc + order.unrealized_pnl, 0) ?? 0;
                     return (
                       <>
-                        <span className={`font-semibold text-foreground ${totalPnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        <span className="font-semibold text-foreground">
                           {totalPnl >= 0 ? "$" : "-$"}{Math.abs(totalPnl).toFixed(2)}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className={`text-[10px] ${totalPnl >= 0 ? "text-green-600" : "text-red-600"}`}>
                           {totalPnl >= 0 ? "+" : "-"} {Math.abs(totalPnl).toFixed(2)}%
                         </span>
                       </>
