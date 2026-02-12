@@ -20,6 +20,7 @@ from .market_data import (
     fetch_watchlist,
     fetch_company_name,
     is_market_open,
+    search_stocks,
 )
 from .models import Account, Order, Position, User, WatchlistItem
 from .websocket_manager import ws_manager
@@ -281,6 +282,15 @@ def portfolio():
             }
         )
     return jsonify(portfolio_payload)
+
+
+@api.get("/search")
+def search():
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"results": []})
+    results = search_stocks(q, max_results=10)
+    return jsonify({"results": results})
 
 
 @api.get("/quote")

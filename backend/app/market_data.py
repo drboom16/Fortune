@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import requests
 import yfinance as yf
 
 def _mock_price(symbol: str) -> float:
@@ -44,6 +45,37 @@ def fetch_company_name(symbol: str) -> str:
     normalized_symbol = _normalize_symbol(symbol)
     info = yf.Ticker(normalized_symbol).info or {}
     return info.get("longName") or info.get("shortName") or normalized_symbol
+
+
+def search_stocks(query: str, max_results: int = 10) -> list[dict]:
+    """Search stocks by ticker or company name. Returns list of {symbol, shortName, longName, exchange}."""
+    query = (query or "").strip()
+    if not query:
+        return []
+    try:
+        if hasattr(yf, "Search"):
+            search = yf.Search(query, max_results=max_results, enable_fuzzy_query=True)
+            raw_quotes = search.quotes or []
+        else:
+            resp = requests.get(
+                "https://query1.finance.yahoo.com/v1/finance/search",
+                params={"q": query, "quotesCount": max_results, "enableFuzzyQuery": True},
+                timeout=10,
+            )
+            data = resp.json() if resp.ok else {}
+            raw_quotes = data.get("quotes", [])
+        return [
+            {
+                "symbol": q.get("symbol", ""),
+                "shortName": q.get("shortName") or q.get("symbol", ""),
+                "longName": q.get("longName") or q.get("shortName") or q.get("symbol", ""),
+                "exchange": q.get("exchange", ""),
+            }
+            for q in raw_quotes
+            if q.get("symbol")
+        ]
+    except Exception:
+        return []
 
 def fetch_quote(symbol: str) -> dict:
     if os.environ.get("MARKET_DATA_MOCK", "false").lower() == "true":
