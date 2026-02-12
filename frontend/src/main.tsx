@@ -11,6 +11,7 @@ import Home from "./pages/Home";
 import MarketStock from "./pages/MarketStock";
 import PortfolioLayout from "./pages/PortfolioLayout";
 import PortfolioBreakdown from "./pages/PortfolioBreakdown";
+import SearchNoResults from "./pages/SearchNoResults";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -20,6 +21,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route element={<App />}>
           <Route path="home" element={<Home />} />
           <Route path="market/:symbol" element={<MarketStock />} />
+          <Route path="search/no-results" element={<SearchNoResults />} />
           <Route path="watchlist" element={<Watchlist />} />
           <Route path="portfolio" element={<PortfolioLayout />} >
             <Route path="overview" element={<PortfolioOverview />} />
