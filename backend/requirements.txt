@@ -10,3 +10,4 @@ yfinance
 pytest
 APScheduler
 Flask-APScheduler
+resend
