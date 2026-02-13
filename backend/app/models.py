@@ -99,3 +99,17 @@ class WatchlistItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship("User", back_populates="watchlist_items")
+
+
+class PriceAlert(db.Model):
+    __tablename__ = "price_alerts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    symbol = db.Column(db.String(16), nullable=False)
+    base_price = db.Column(db.Numeric(14, 4), nullable=False)
+    threshold_percent = db.Column(db.Numeric(8, 4), nullable=False)  # e.g. -10, +5
+    triggered = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", backref=db.backref("price_alerts", lazy="dynamic"))
