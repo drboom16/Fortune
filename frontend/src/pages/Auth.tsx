@@ -40,22 +40,6 @@ export default function Auth() {
     }
   };
 
-  const refreshSession = async () => {
-    setLoading(true);
-    setMessage(null);
-    try {
-      const response = await apiFetch("/auth/refresh", { method: "POST" });
-      if (!response.ok) {
-        throw new Error("Refresh failed.");
-      }
-      setMessage("Session refreshed.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Unable to refresh session.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-cover bg-center px-6 py-10"
@@ -117,12 +101,7 @@ export default function Auth() {
             </Button>
           </form>
 
-          <div className="grid gap-2">
-            <Button variant="secondary" onClick={refreshSession} disabled={loading}>
-              Refresh Session
-            </Button>
-            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-          </div>
+          {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
         </CardContent>
       </Card>
     </div>
