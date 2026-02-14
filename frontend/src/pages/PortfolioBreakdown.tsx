@@ -6,6 +6,7 @@ import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
+import { apiFetch } from "../lib/api";
 
 interface Order {
   id: number,
@@ -22,41 +23,6 @@ interface Order {
   take_profit_price?: number;
   exchange?: string;
   currency?: string;
-}
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
-const getAccessToken = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token || token === "null" || token === "undefined") {
-    return null;
-  }
-  return token;
-};
-
-const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken || refreshToken === "null" || refreshToken === "undefined") {
-    return null;
-  }
-
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: 'include',
-    headers: { Authorization: `Bearer ${refreshToken}` }
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json()) as { access_token?: string };
-  if (payload.access_token) {
-    localStorage.setItem("access_token", payload.access_token);
-    return payload.access_token;
-  }
-
-  return null;
 }
 
 export default function PortfolioBreakdown() {
@@ -102,22 +68,11 @@ export default function PortfolioBreakdown() {
 
   const handleSellStock = async (id: number, symbol: string, quantity: number) => {
     setLoading(true);
-    const token = getAccessToken();
-    if (!token) return;
     if (!symbol || !quantity) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/sell`, {
+      const response = await apiFetch("/sell", {
         method: "POST",
-        credentials: 'include',
-        headers: { 
-          Authorization: `Bearer ${token}`, 
-          "Content-Type": "application/json" 
-        },
-        body: JSON.stringify({ 
-          id: id,
-          symbol: symbol, 
-          quantity: quantity, 
-        })
+        body: JSON.stringify({ id, symbol, quantity }),
       });
       if (!response.ok) throw new Error("Failed to sell stock.");
       setCloseTradeModalActive(false);
@@ -130,39 +85,19 @@ export default function PortfolioBreakdown() {
   };
 
   const handleUpdateThresholds = async () => {
-    const token = getAccessToken();
-    if (!token) return;
     if (!order) return;
-    const response = await fetch(`${API_BASE_URL}/portfolio/breakdown/thresholds`, {
+    const response = await apiFetch("/portfolio/breakdown/thresholds", {
       method: "POST",
-      credentials: 'include',
-      headers: { 
-        Authorization: `Bearer ${token}`, 
-        "Content-Type": "application/json" 
-      },
-      body: JSON.stringify({ 
-        id: order.id,
-        stop_loss_price: parseFloat(stopLossPrice), 
-        take_profit_price: parseFloat(takeProfitPrice) 
-      })
+      body: JSON.stringify({ id: order.id, stop_loss_price: parseFloat(stopLossPrice), take_profit_price: parseFloat(takeProfitPrice) }),
     });
     if (!response.ok) throw new Error("Failed to update thresholds.");
     handleCloseModal();
   }
 
   const handleCloseAllTrades = async () => {
-    const token = getAccessToken();
-    if (!token) return;
-    const response = await fetch(`${API_BASE_URL}/portfolio/breakdown/close-all`, {
+    const response = await apiFetch("/portfolio/breakdown/close-all", {
       method: "POST",
-      credentials: 'include',
-      headers: { 
-        Authorization: `Bearer ${token}`, 
-        "Content-Type": "application/json" 
-      },
-      body: JSON.stringify({ 
-        symbol: symbol
-      })
+      body: JSON.stringify({ symbol: symbol }),
     });
     if (!response.ok) throw new Error("Failed to close all trades.");
     setCloseAllTradesModalActive(false);
@@ -174,32 +109,9 @@ export default function PortfolioBreakdown() {
       if (showLoading) setLoading(true);
 
       try {
-        const token = getAccessToken();
-        if (!token) {
-          return;
-        }
-  
-        let response = await fetch(`${API_BASE_URL}/portfolio/breakdown/${symbol}`, {
-          method: "GET",
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-  
-        if (response.status === 401 || response.status === 422) {
-          const refreshed = await refreshAccessToken();
-          if (!refreshed) {
-            return;
-          }
-  
-          response = await fetch(`${API_BASE_URL}/portfolio/breakdown/${symbol}`, {
-            method: "GET",
-            credentials: 'include',
-            headers: { Authorization: `Bearer ${refreshed}`}
-          });
-        }
-  
+        const response = await apiFetch(`/portfolio/breakdown/${symbol}`);
         if (!response.ok) {
-          throw new Error("Failed to load position breakdown.");
+          return;
         }
   
         const payload = (await response.json()) as { order_history: Order[] };
@@ -225,7 +137,7 @@ export default function PortfolioBreakdown() {
 
   useEffect(() => {
     const loadMarketStatus = async () => {
-      const response = await fetch(`${API_BASE_URL}/market/status?symbol=${symbol}`);
+      const response = await apiFetch(`/market/status?symbol=${symbol}`);
       if (!response.ok) throw new Error("Failed to load market status.");
       const payload = (await response.json()) as { market_status: boolean };
       setMarketStatus(payload.market_status);

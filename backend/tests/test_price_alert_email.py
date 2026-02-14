@@ -64,14 +64,11 @@ def test_price_alert_email_fire_off(app_with_logged_in_user):
             json={"email": "mrchristianm6@gmail.com", "password": "testpass123"},
         )
         assert response.status_code == 201
-        data = response.get_json()
-        access_token = data["access_token"]
 
         with patch("app.routes.get_current_price") as mock_price:
             mock_price.return_value = 100.0
             alert_response = client.post(
                 "/api/price-alerts",
-                headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
                 json={"symbol": "TEST", "threshold_percent": -5.0},
             )
         assert alert_response.status_code == 201
