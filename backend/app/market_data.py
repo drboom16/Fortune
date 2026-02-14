@@ -1,6 +1,7 @@
+import math
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 import yfinance as yf
@@ -40,6 +41,34 @@ def _format_percent(value: Optional[float]) -> Optional[str]:
         return f"{float(value):+.2f}%"
     except (TypeError, ValueError):
         return None
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    """Convert to float, return None for NaN/None/invalid. Ensures JSON-safe values."""
+    if value is None:
+        return None
+    try:
+        x = float(value)
+        return None if (math.isnan(x) or math.isinf(x)) else x
+    except (TypeError, ValueError):
+        return None
+
+
+def _get_info_value(info: dict, *keys: str, default: Any = None) -> Any:
+    """Get first non-None, non-NaN value from info dict for given keys."""
+    for key in keys:
+        val = info.get(key)
+        if val is None:
+            continue
+        try:
+            f = float(val)
+            if math.isnan(f) or math.isinf(f):
+                continue
+        except (TypeError, ValueError):
+            pass
+        return val
+    return default
+
 
 def fetch_company_name(symbol: str) -> str:
     normalized_symbol = _normalize_symbol(symbol)
@@ -115,12 +144,14 @@ def fetch_quote(symbol: str) -> dict:
         and previous_close_value
     ):
         change_percent_value = (float(change_value) / float(previous_close_value)) * 100
+    change = round(float(change_value), 2) if change_value is not None else 0.0
+    change_percent = round(float(change_percent_value), 2) if change_percent_value is not None else 0.0
     return {
         "symbol": symbol,
         "price": float(price_value) if price_value is not None else 0.0,
         "previous_close": float(previous_close_value) if previous_close_value is not None else 0.0,
-        "change": float(change_value) if change_value is not None else 0.0,
-        "change_percent": float(change_percent_value) if change_percent_value is not None else 0.0,
+        "change": change,
+        "change_percent": change_percent,
         "exchange": info.get("exchange") or fast_info.get("exchange"),
         "currency": info.get("currency") or fast_info.get("currency"),
     }
@@ -260,9 +291,9 @@ def fetch_watchlist(limit: int = 20, symbols: Optional[list[str]] = None) -> lis
             {
                 "ticker": normalized_symbol,
                 "company_name": info.get("longName") or info.get("shortName") or normalized_symbol,
-                "value": float(price),
-                "change_1d": float(change_value),
-                "52w_range": [float(range_low), float(range_high)],
+                "value": round(float(price), 2),
+                "change_1d": round(float(change_value), 2),
+                "52w_range": [round(float(range_low), 2), round(float(range_high), 2)],
             }
         )
     return items
@@ -280,36 +311,93 @@ def fetch_company_profile(symbol: str) -> dict:
     }
 
 
+def _extract_ceo(info: dict) -> Optional[str]:
+    """Extract CEO name from companyOfficers if available."""
+    officers = info.get("companyOfficers")
+    if not isinstance(officers, list):
+        return None
+    for officer in officers:
+        if not isinstance(officer, dict):
+            continue
+        title = (officer.get("title") or "").upper()
+        if "CEO" in title or "CHIEF EXECUTIVE" in title:
+            return officer.get("name")
+    return None
+
+
 def fetch_company_snapshot(symbol: str) -> dict:
     normalized = _normalize_symbol(symbol)
     ticker = yf.Ticker(normalized)
     info = ticker.info or {}
-    fast_info = getattr(ticker, "fast_info", {}) or {}
+    fast_info = getattr(ticker, "fast_info", None)
+    if callable(fast_info):
+        fast_info = {}
+    elif fast_info is None:
+        fast_info = {}
 
-    market_state = info.get("marketState") or fast_info.get("market_state")
-    market_status = "Market Open" if str(market_state).upper() == "REGULAR" else "Market Closed"
+    market_state = info.get("marketState") or (fast_info.get("market_state") if isinstance(fast_info, dict) else None)
+    market_status = "Market Open" if str(market_state or "").upper() == "REGULAR" else "Market Closed"
 
-    current_price = info.get("regularMarketPrice") or fast_info.get("last_price")
-    change_absolute = info.get("regularMarketChange")
-    change_percentage = info.get("regularMarketChangePercent")
+    current_price = _safe_float(_get_info_value(info, "regularMarketPrice", "currentPrice") or (fast_info.get("last_price") if isinstance(fast_info, dict) else None))
+    change_absolute_raw = _safe_float(info.get("regularMarketChange"))
+    change_percentage_raw = _safe_float(info.get("regularMarketChangePercent"))
+    change_absolute = round(change_absolute_raw, 2) if change_absolute_raw is not None else None
+    change_percentage = round(change_percentage_raw, 2) if change_percentage_raw is not None else None
 
-    day_low = info.get("regularMarketDayLow")
-    day_high = info.get("regularMarketDayHigh")
-    week_low = info.get("fiftyTwoWeekLow")
-    week_high = info.get("fiftyTwoWeekHigh")
+    day_low = _safe_float(_get_info_value(info, "regularMarketDayLow", "dayLow"))
+    day_high = _safe_float(_get_info_value(info, "regularMarketDayHigh", "dayHigh"))
+    week_low = _safe_float(_get_info_value(info, "fiftyTwoWeekLow"))
+    week_high = _safe_float(_get_info_value(info, "fiftyTwoWeekHigh"))
 
-    market_cap = info.get("marketCap")
-    volume_avg = info.get("averageVolume")
-    pe_ratio = info.get("trailingPE") or info.get("forwardPE")
-    revenue_ttm = info.get("totalRevenue")
+    prev_close = _safe_float(_get_info_value(info, "regularMarketPreviousClose", "previousClose"))
+
+    market_cap = _get_info_value(info, "marketCap")
+    volume_avg = _get_info_value(info, "averageVolume", "averageDailyVolume10Day")
+    pe_ratio = _safe_float(_get_info_value(info, "trailingPE", "forwardPE"))
+    revenue_ttm = _get_info_value(info, "totalRevenue")
+    eps = _safe_float(_get_info_value(info, "trailingEps", "forwardEps"))
+    dividend_yield_raw = _safe_float(_get_info_value(info, "dividendYield", "trailingAnnualDividendYield"))
+    dividend_yield_pct = None
+    if dividend_yield_raw is not None:
+        dividend_yield_pct = dividend_yield_raw * 100 if dividend_yield_raw < 0.1 else dividend_yield_raw
+    beta = _safe_float(_get_info_value(info, "beta"))
+    fifty_two_week_change = _safe_float(_get_info_value(info, "52WeekChange"))
 
     history = ticker.history(period="5d")
     past_week_growth = None
     if history is not None and not history.empty:
         first_close = history["Close"].iloc[0]
         last_close = history["Close"].iloc[-1]
-        if first_close:
-            past_week_growth = _format_percent(((last_close - first_close) / first_close) * 100)
+        if first_close and not (hasattr(first_close, "__float__") and math.isnan(float(first_close))):
+            past_week_growth = _format_percent(((float(last_close) - float(first_close)) / float(first_close)) * 100)
+
+    day_range_str = None
+    if day_low is not None and day_high is not None:
+        day_range_str = f"{day_low:.2f} - {day_high:.2f}"
+    elif day_low is not None:
+        day_range_str = f"{day_low:.2f} - —"
+    elif day_high is not None:
+        day_range_str = f"— - {day_high:.2f}"
+
+    year_range_str = None
+    if week_low is not None and week_high is not None:
+        year_range_str = f"{week_low:.2f} - {week_high:.2f}"
+    elif week_low is not None:
+        year_range_str = f"{week_low:.2f} - —"
+    elif week_high is not None:
+        year_range_str = f"— - {week_high:.2f}"
+
+    one_year_return = _format_percent(fifty_two_week_change * 100) if fifty_two_week_change is not None else None
+
+    sector = info.get("sector") or None
+    industry = info.get("industry") or None
+    employees = info.get("fullTimeEmployees")
+    if employees is not None:
+        try:
+            employees = int(employees) if not (hasattr(employees, "__float__") and math.isnan(float(employees))) else None
+        except (TypeError, ValueError):
+            employees = None
+    ceo = _extract_ceo(info)
 
     upcoming_event = {
         "event_type": None,
@@ -354,13 +442,30 @@ def fetch_company_snapshot(symbol: str) -> dict:
             "day_range": {"low": day_low, "high": day_high},
             "52w_range": {"low": week_low, "high": week_high},
         },
+        "profile": {
+            "sector": sector,
+            "industry": industry,
+            "ceo": ceo,
+            "employees": employees,
+        },
+        "financials": {
+            "prev_close": prev_close,
+            "market_cap": _format_compact_number(market_cap),
+            "day_range": day_range_str,
+            "year_range": year_range_str,
+            "volume_3m": _format_compact_number(volume_avg),
+            "revenue": _format_compact_number(revenue_ttm),
+            "eps": eps,
+            "dividend_yield": dividend_yield_pct,
+            "beta": beta,
+            "one_year_return": one_year_return,
+        },
         "upcoming_events": upcoming_event,
         "analyst_forecast": {
             "consensus": info.get("recommendationKey"),
-            "price_target": info.get("targetMeanPrice"),
+            "price_target": _safe_float(info.get("targetMeanPrice")),
             "analyst_count": info.get("numberOfAnalystOpinions"),
         },
-        "related_content": {"people_also_bought": []},
         "metadata": {
             "source_screenshot_date": datetime.now(timezone.utc).date().isoformat(),
             "primary_exchange": info.get("exchange") or info.get("fullExchangeName"),

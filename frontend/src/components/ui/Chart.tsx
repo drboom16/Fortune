@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,33 +10,10 @@ import {
   Legend,
   Filler,
   ChartOptions,
-  Plugin,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import type { ChartData } from "../../data/Mockdata";
 import { ArrowUp, ArrowDown } from "lucide-react";
-
-// Custom plugin for vertical crosshair
-const crosshairPlugin: Plugin = {
-  id: "crosshair",
-  afterDraw: (chart) => {
-    if (chart.tooltip?.opacity && chart.tooltip.caretX) {
-      const ctx = chart.ctx;
-      const x = chart.tooltip.caretX;
-      const topY = chart.scales.y.top;
-      const bottomY = chart.scales.y.bottom;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(x, topY);
-      ctx.lineTo(x, bottomY);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-      ctx.stroke();
-      ctx.restore();
-    }
-  },
-};
 
 ChartJS.register(
   CategoryScale,
@@ -46,9 +23,21 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler,
-  crosshairPlugin
+  Filler
 );
+
+const MAX_POINTS = 120;
+
+function decimate(data: ChartData[], maxPoints: number): ChartData[] {
+  if (data.length <= maxPoints) return data;
+  const result: ChartData[] = [];
+  const step = (data.length - 1) / (maxPoints - 1);
+  for (let i = 0; i < maxPoints; i++) {
+    const idx = i === maxPoints - 1 ? data.length - 1 : Math.floor(i * step);
+    result.push(data[idx]);
+  }
+  return result;
+}
 
 interface StockChartProps {
   data: ChartData[];
@@ -67,16 +56,37 @@ const TIME_PERIODS = [
 
 export default function StockChart({ data, symbol, onPeriodChange }: StockChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("1mo");
-  const chartRef = useRef<ChartJS<"line">>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const crosshairRef = useRef<HTMLDivElement>(null);
 
   const handlePeriodChange = (period: string) => {
     setSelectedPeriod(period);
     onPeriodChange?.(period);
   };
 
-  // Process data for chart
-  const chartData = {
-    labels: data.map((d) => {
+  const handleChartMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    const crosshair = crosshairRef.current;
+    if (!el || !crosshair) return;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x >= 0 && x <= rect.width) {
+      crosshair.style.left = `${x}px`;
+      crosshair.style.visibility = "visible";
+    } else {
+      crosshair.style.visibility = "hidden";
+    }
+  };
+
+  const handleChartMouseLeave = () => {
+    const crosshair = crosshairRef.current;
+    if (crosshair) crosshair.style.visibility = "hidden";
+  };
+
+  const displayData = useMemo(() => decimate(data, MAX_POINTS), [data]);
+
+  const chartData = useMemo(() => ({
+    labels: displayData.map((d) => {
       const date = new Date(d.time * 1000);
       if (selectedPeriod === "1d") {
         return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -88,7 +98,7 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
     datasets: [
       {
         label: symbol,
-        data: data.map((d) => d.close),
+        data: displayData.map((d) => d.close),
         borderColor: data.length > 0 && data[data.length - 1].close >= data[0].close
           ? "rgb(16, 185, 129)" // emerald-500
           : "rgb(244, 63, 94)", // rose-500
@@ -105,11 +115,12 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
         spanGaps: false,
       },
     ],
-  };
+  }), [displayData, symbol, data, selectedPeriod]);
 
   const options: ChartOptions<"line"> = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     interaction: {
       mode: "index",
       intersect: false,
@@ -123,6 +134,11 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
         mode: "index",
         intersect: false,
         position: "nearest",
+        caretSize: 0,
+        animation: {
+          duration: 150,
+          easing: "easeOutQuart",
+        },
         backgroundColor: "rgba(30, 41, 59, 0.95)",
         padding: 16,
         titleColor: "#fff",
@@ -141,7 +157,8 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
         callbacks: {
           title: (tooltipItems) => {
             const dataIndex = tooltipItems[0].dataIndex;
-            const timestamp = data[dataIndex].time;
+            const timestamp = displayData[dataIndex]?.time;
+            if (timestamp == null) return "";
             const date = new Date(timestamp * 1000);
             
             if (selectedPeriod === "1d") {
@@ -197,7 +214,7 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
       padding: {
         left: 0,
         right: 0,
-        top: 10,
+        top: 0,
         bottom: 0,
       },
     },
@@ -210,7 +227,7 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
   const isPositive = priceChange >= 0;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
+    <div className="rounded-2xl border border-border bg-card p-6 overflow-hidden">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold">Performance</h2>
@@ -244,9 +261,26 @@ export default function StockChart({ data, symbol, onPeriodChange }: StockChartP
         </div>
       </div>
       
-      <div className="h-[400px] w-full">
+      <div
+        ref={containerRef}
+        className="relative h-[400px] w-full -mx-6 -mb-6"
+        onMouseMove={handleChartMouseMove}
+        onMouseLeave={handleChartMouseLeave}
+      >
         {data.length > 0 ? (
-          <Line ref={chartRef} data={chartData} options={options} />
+          <>
+            <div
+              className="absolute inset-0"
+              style={{ transform: "translateX(2.2%) scaleX(1.045)" }}
+            >
+              <Line data={chartData} options={options} />
+            </div>
+            <div
+              ref={crosshairRef}
+              className="absolute top-0 bottom-0 w-px pointer-events-none border-l border-dashed border-slate-400/50 transition-[left] duration-100 ease-out"
+              style={{ left: 0, visibility: "hidden" }}
+            />
+          </>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             No chart data available

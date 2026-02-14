@@ -3,6 +3,7 @@ import { Info, Minus, Plus, Search, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import StockChart from "../components/ui/Chart";
+import { LoadingSpinner } from "../components/ui/loading-spinner";
 import { apiFetch } from "../lib/api";
 import {
   MOCK_AAPL_DATA,
@@ -11,6 +12,18 @@ import {
   type AiCompanyPayload,
   type ChartData,
 } from "../data/Mockdata";
+
+const formatNum = (v: unknown): string => {
+  if (v == null) return "—";
+  const n = Number(v);
+  return Number.isNaN(n) ? "—" : n.toFixed(2);
+};
+
+const formatPrice = (v: unknown): string => {
+  if (v == null) return "—";
+  const n = Number(v);
+  return Number.isNaN(n) ? "—" : n.toFixed(2);
+};
 
 const metricLabels: Array<{ key: keyof NonNullable<AiCompanyPayload["performance_metrics"]>; label: string }> = [
   { key: "past_week_growth", label: "Past Week Growth" },
@@ -190,7 +203,7 @@ export default function MarketStock() {
         `/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
         {
           method: isInWatchlist ? "DELETE" : "POST",
-          body: isInWatchlist ? null : JSON.stringify({ symbol: normalizedSymbol }),
+          body: isInWatchlist ? null : { symbol: normalizedSymbol },
         }
       );
       if (!response.ok) {
@@ -215,14 +228,12 @@ export default function MarketStock() {
   }, [data]);
 
   const quote = data?.quote ?? {};
-  const changeAbsolute = quote.change_absolute;
-  const changePercent = quote.change_percentage?.toFixed(2);
-  const isPositive = (changeAbsolute ?? 0) >= 0;
+  const changeAbsolute = quote.change_absolute != null ? Number(quote.change_absolute).toFixed(2) : undefined;
+  const changePercent = quote.change_percentage != null ? Number(quote.change_percentage).toFixed(2) : undefined;
+  const isPositive = (quote.change_absolute ?? 0) >= 0;
   const performance = data?.performance_metrics ?? {};
   const financials = data?.financials ?? {};
   const profile = data?.profile ?? {};
-  const latestNews = data?.latest_news ?? [];
-  const relatedCompanies = data?.related_companies ?? [];
   const priceValue = Number(quote.current_price) || 0;
 
   const handleAmountChange = (value: string) => {
@@ -291,7 +302,7 @@ export default function MarketStock() {
     try {
       const response = await apiFetch("/orders", {
         method: "POST",
-        body: JSON.stringify({ symbol: normalizedSymbol, side: "BUY", quantity: shares }),
+        body: { symbol: normalizedSymbol, side: "BUY", quantity: shares },
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -311,7 +322,7 @@ export default function MarketStock() {
     try {
       const res = await apiFetch("/price-alerts", {
         method: "POST",
-        body: JSON.stringify({ symbol: normalizedSymbol, threshold_percent: thresholdPercent }),
+        body: { symbol: normalizedSymbol, threshold_percent: thresholdPercent },
       });
       if (res.ok) {
         const data = await res.json();
@@ -335,7 +346,7 @@ export default function MarketStock() {
   const targetPrice = priceValue ? priceValue * (1 + customAlertPercent / 100) : 0;
 
   return (
-    <div className="flex flex-col gap-6 pt-48">
+    <div className={`flex flex-col gap-6 ${loading || !data ? "pt-24" : "pt-48"}`}>
       <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
         <div className="flex h-24 items-center justify-between gap-6 px-8">
           <div className="flex flex-1 items-center justify-center py-1">
@@ -343,10 +354,10 @@ export default function MarketStock() {
           </div>
         </div>
       </header>
+      {!loading && data && (
       <section className="fixed top-24 z-20 border-b border-border/40 bg-card/95 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
         <div className="flex items-center justify-between gap-6 px-8 py-4">
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-xl bg-muted" />
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-foreground">{data?.ticker ?? normalizedSymbol}</span>
               <span className="text-xs text-muted-foreground">
@@ -387,15 +398,16 @@ export default function MarketStock() {
           </div>
         </div>
       </section>
+      )}
 
       {tradeOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-modal-backdrop"
             onClick={closeTradeModal}
             role="presentation"
           />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl animate-modal-content">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
@@ -531,11 +543,11 @@ export default function MarketStock() {
       {priceAlertModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-modal-backdrop"
             onClick={closePriceAlertModal}
             role="presentation"
           />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl animate-modal-content">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">Set Price Alert</h2>
@@ -596,11 +608,17 @@ export default function MarketStock() {
       ) : null}
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading company data…</div>
+        <div className="flex min-h-[calc(100vh-12rem)] w-full flex-col items-center justify-center">
+          <LoadingSpinner label={normalizedSymbol} sublabel="Loading…" />
+        </div>
       ) : error ? (
-        <div className="text-sm text-rose-500">{error}</div>
+        <div className="flex h-[calc(100vh-12rem)] w-full flex-col items-center justify-center gap-2">
+          <p className="text-sm font-medium text-rose-500">{error}</p>
+        </div>
       ) : !data ? (
-        <div className="text-sm text-muted-foreground">No company data found.</div>
+        <div className="flex h-[calc(100vh-12rem)] w-full flex-col items-center justify-center gap-2">
+          <p className="text-sm text-muted-foreground">No company data found.</p>
+        </div>
       ) : (
         <>
           {/* Chart Section - Placed prominently at the top */}
@@ -614,7 +632,6 @@ export default function MarketStock() {
 
           {(() => {
             const quote = data.quote ?? {};
-            const upcoming = data.upcoming_events ?? {};
             const analyst = data.analyst_forecast ?? {};
             const metadata = data.metadata ?? {};
 
@@ -629,7 +646,9 @@ export default function MarketStock() {
                         metrics.map((item) => (
                           <div key={item.label} className="flex items-center justify-between border-b border-border/60 pb-2">
                             <span className="text-muted-foreground">{item.label}</span>
-                            <span className="font-semibold">{String(item.value)}</span>
+                            <span className="font-semibold">
+                              {typeof item.value === "number" ? formatNum(item.value) : String(item.value)}
+                            </span>
                           </div>
                         ))
                       ) : (
@@ -638,32 +657,18 @@ export default function MarketStock() {
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border bg-card p-6">
-                    <h2 className="text-lg font-semibold">Upcoming Events</h2>
-                    <div className="mt-4 grid gap-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Event</span>
-                        <span className="font-semibold">{upcoming.event_type ?? "—"}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Fiscal Period</span>
-                        <span className="font-semibold">{upcoming.fiscal_period ?? "—"}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Date</span>
-                        <span className="font-semibold">{upcoming.date ?? "—"}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Timing</span>
-                        <span className="font-semibold">{upcoming.timing ?? "—"}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-card p-6">
                     <h2 className="text-lg font-semibold">Analyst Forecast</h2>
                     <div className="mt-4 grid gap-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Consensus</span>
-                        <span className="font-semibold">{analyst.consensus ?? "—"}</span>
+                        <span className="font-semibold">
+                          {analyst.consensus
+                            ? analyst.consensus
+                                .split("_")
+                                .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                                .join(" ")
+                            : "—"}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Price Target</span>
@@ -706,24 +711,6 @@ export default function MarketStock() {
                       </button>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-border bg-card p-6">
-                    <h2 className="text-lg font-semibold">People Also Bought</h2>
-                    <div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
-                      {relatedCompanies.length ? (
-                        relatedCompanies.map((item) => (
-                          <div key={item.ticker} className="flex items-center justify-between text-sm">
-                            <div>
-                              <div className="font-semibold">{item.ticker}</div>
-                              <div className="text-xs text-muted-foreground">{item.name}</div>
-                            </div>
-                            <div className="text-xs text-rose-500">{item.change}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-muted-foreground">No related data.</div>
-                      )}
-                    </div>
-                  </div>
                 </section>
 
                 <section className="flex flex-col gap-4">
@@ -732,7 +719,7 @@ export default function MarketStock() {
                     <div className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">Prev Close</span>
-                        <span className="font-semibold">{financials.prev_close ?? "—"}</span>
+                        <span className="font-semibold">{formatPrice(financials.prev_close)}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">Market Cap</span>
@@ -744,7 +731,7 @@ export default function MarketStock() {
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">P/E Ratio</span>
-                        <span className="font-semibold">{Number(performance.pe_ratio)?.toFixed(2) ?? "—"}</span>
+                        <span className="font-semibold">{formatNum(performance.pe_ratio)}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">52W Range</span>
@@ -760,15 +747,15 @@ export default function MarketStock() {
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">EPS</span>
-                        <span className="font-semibold">{Number(financials.eps)?.toFixed(2) ?? "—"}</span>
+                        <span className="font-semibold">{formatNum(financials.eps)}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">Dividend (Yield)</span>
-                        <span className="font-semibold">{Number(financials.dividend_yield)?.toFixed(2) ?? "—"}</span>
+                        <span className="font-semibold">{formatNum(financials.dividend_yield) !== "—" ? `${formatNum(financials.dividend_yield)}%` : "—"}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">Beta</span>
-                        <span className="font-semibold">{Number(financials.beta)?.toFixed(2) ?? "—"}</span>
+                        <span className="font-semibold">{formatNum(financials.beta)}</span>
                       </div>
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-muted-foreground">1 Year Return</span>
@@ -792,23 +779,6 @@ export default function MarketStock() {
                         <span className="text-muted-foreground">Employees</span>
                         <span className="font-semibold">{profile.employees ?? "—"}</span>
                       </div>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-card p-6">
-                    <h2 className="text-lg font-semibold">Latest News</h2>
-                    <div className="mt-4 grid gap-3">
-                      {latestNews.length ? (
-                        latestNews.map((item) => (
-                          <div key={item.title} className="border-b border-border/60 pb-3 text-sm">
-                            <div className="font-semibold">{item.title}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.source} · {item.time}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-muted-foreground">No news available.</div>
-                      )}
                     </div>
                   </div>
                 </section>

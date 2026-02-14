@@ -3,6 +3,7 @@ import { Briefcase, Eye, Home, LogOut, PanelLeft } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Button } from "./components/ui/button";
+import { ThemeToggle } from "./components/ui/theme-toggle";
 import { apiFetch } from "./lib/api";
 
 const navBase = "flex items-center rounded-xl py-4 text-left text-base font-medium";
@@ -54,6 +55,9 @@ export default function App() {
       className="h-screen bg-background overflow-hidden"
       style={{ "--sidebar-width": sidebarWidth } as React.CSSProperties}
     >
+      <div className="fixed top-6 right-8 z-50 flex h-12 items-center">
+        <ThemeToggle />
+      </div>
       <div className="h-full">
         <aside
           className={`fixed inset-y-0 left-0 shrink-0 border-r border-border bg-card transition-all duration-300 flex flex-col ${

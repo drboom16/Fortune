@@ -46,9 +46,6 @@ export interface ChartData {
       price_target?: number;
       analyst_count?: number;
     };
-    related_content?: {
-      people_also_bought?: string[];
-    };
     metadata?: {
       source_screenshot_date?: string;
       primary_exchange?: string;
@@ -71,8 +68,6 @@ export interface ChartData {
       volume_3m?: string;
       revenue?: string;
     };
-    latest_news?: Array<{ title: string; source: string; time: string }>;
-    related_companies?: Array<{ ticker: string; name: string; change: string }>;
   }
   
   // Generate realistic intraday data (1 day - 5 minute intervals)
@@ -371,9 +366,6 @@ export interface ChartData {
       price_target: 214.35,
       analyst_count: 41
     },
-    related_content: {
-      people_also_bought: ["Microsoft", "Alphabet Class A", "NVIDIA", "Amazon", "Meta"]
-    },
     metadata: {
       source_screenshot_date: "2026-02-02",
       primary_exchange: "NASDAQ"
@@ -396,16 +388,4 @@ export interface ChartData {
       volume_3m: "58.21M",
       revenue: "382.49B"
     },
-    latest_news: [
-      { title: "Apple unveils new AI tools for creators", source: "Reuters", time: "2h ago" },
-      { title: "iPhone demand stays resilient in Q1", source: "Bloomberg", time: "6h ago" },
-      { title: "Apple services revenue hits record", source: "WSJ", time: "1d ago" }
-    ],
-    related_companies: [
-      { ticker: "GOOG", name: "Alphabet", change: "-2.36%" },
-      { ticker: "MSFT", name: "Microsoft", change: "-1.78%" },
-      { ticker: "AMZN", name: "Amazon", change: "-1.80%" },
-      { ticker: "NKE", name: "Nike", change: "-1.44%" },
-      { ticker: "TSLA", name: "Tesla", change: "-2.70%" }
-    ]
   };

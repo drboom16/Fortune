@@ -34,9 +34,11 @@ def create_app(config=None):  # ← Add config parameter
     app.config["JWT_REFRESH_COOKIE_NAME"] = "refresh_token"
     app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
     app.config["JWT_REFRESH_COOKIE_PATH"] = "/"
+    # Don't set cookie domain so browser uses request host (works with proxy)
+    app.config["JWT_COOKIE_DOMAIN"] = None
 
     # CORS: must specify origins (not *) when using credentials
-    cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173").split(",")
     app.config["CORS_SUPPORTS_CREDENTIALS"] = True
 
     # Apply config overrides BEFORE initializing extensions

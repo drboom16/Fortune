@@ -36,3 +36,32 @@
 body {
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+/* Empty-state and icon images: white fill in dark mode */
+.dark img[src*="price-timeseries"],
+.dark img[src*="pi-chart"],
+.dark img[src*="stock-not-found"] {
+  filter: invert(1);
+}
+
+/* Smooth modal animations */
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.animate-modal-backdrop {
+  animation: modal-backdrop-in 0.2s ease-out forwards;
+}
+.animate-modal-content {
+  animation: modal-content-in 0.25s ease-out forwards;
+}
