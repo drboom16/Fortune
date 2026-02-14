@@ -5,6 +5,7 @@ import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
+import { apiFetch } from "../lib/api";
 
 interface Position {
   symbol: string,
@@ -29,41 +30,6 @@ interface PendingOrder {
   created_at: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
-const getAccessToken = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token || token === "null" || token === "undefined") {
-    return null;
-  }
-  return token;
-};
-
-const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken || refreshToken === "null" || refreshToken === "undefined") {
-    return null;
-  }
-
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: 'include',
-    headers: { Authorization: `Bearer ${refreshToken}` }
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json()) as { access_token?: string };
-  if (payload.access_token) {
-    localStorage.setItem("access_token", payload.access_token);
-    return payload.access_token;
-  }
-
-  return null;
-}
-
 type ViewMode = "positions" | "pending";
 
 export default function PortfolioOverview() {
@@ -84,30 +50,9 @@ export default function PortfolioOverview() {
       if (showLoading) setLoading(true);
 
       try {
-        const token = getAccessToken();
-        if (!token) {
-          return;
-        }
-  
-        let response = await fetch(`${API_BASE_URL}/portfolio`, {
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-  
-        if (response.status === 401 || response.status === 422) {
-          const refreshed = await refreshAccessToken();
-          if (!refreshed) {
-            return;
-          }
-  
-          response = await fetch(`${API_BASE_URL}/portfolio`, {
-            credentials: 'include',
-            headers: { Authorization: `Bearer ${refreshed}`}
-          });
-        }
-  
+        const response = await apiFetch("/portfolio");
         if (!response.ok) {
-          throw new Error("Failed to load portfolio.");
+          return;
         }
   
         const payload = (await response.json()) as { account_cash: number, portfolio: Position[] };
@@ -139,24 +84,11 @@ export default function PortfolioOverview() {
     const loadPendingOrders = async () => {
       setPendingOrdersLoading(true);
       try {
-        const token = getAccessToken();
-        if (!token) return;
-
-        let response = await fetch(`${API_BASE_URL}/orders/pending`, {
-          credentials: "include",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.status === 401 || response.status === 422) {
-          const refreshed = await refreshAccessToken();
-          if (!refreshed) return;
-          response = await fetch(`${API_BASE_URL}/orders/pending`, {
-            credentials: "include",
-            headers: { Authorization: `Bearer ${refreshed}` },
-          });
+        const response = await apiFetch("/orders/pending");
+        if (!response.ok) {
+          setPendingOrders([]);
+          return;
         }
-
-        if (!response.ok) throw new Error("Failed to load pending orders.");
         const payload = (await response.json()) as { orders: PendingOrder[] };
         setPendingOrders(Array.isArray(payload.orders) ? payload.orders : []);
       } catch (error) {

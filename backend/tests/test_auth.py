@@ -5,8 +5,9 @@ def test_register_login_refresh(client):
     )
     assert register_response.status_code == 201
     register_payload = register_response.get_json()
-    assert "access_token" in register_payload
-    assert "refresh_token" in register_payload
+    assert "user" in register_payload
+    assert "access_token" not in register_payload
+    assert "refresh_token" not in register_payload
 
     login_response = client.post(
         "/api/auth/login",
@@ -14,13 +15,9 @@ def test_register_login_refresh(client):
     )
     assert login_response.status_code == 200
     login_payload = login_response.get_json()
-    assert "access_token" in login_payload
-    assert "refresh_token" in login_payload
+    assert "user" in login_payload
 
-    refresh_response = client.post(
-        "/api/auth/refresh",
-        headers={"Authorization": f"Bearer {login_payload['refresh_token']}"},
-    )
+    refresh_response = client.post("/api/auth/refresh")
     assert refresh_response.status_code == 200
     refresh_payload = refresh_response.get_json()
-    assert "access_token" in refresh_payload
+    assert "user" in refresh_payload

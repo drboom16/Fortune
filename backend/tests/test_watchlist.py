@@ -27,22 +27,16 @@ def test_watchlist_add_remove(client, monkeypatch):
         json={"email": "watcher@example.com", "password": "password123"},
     )
     assert register_response.status_code == 201
-    tokens = register_response.get_json()
-    access_token = tokens["access_token"]
 
     add_response = client.post(
         "/api/market/watchlist",
         json={"symbol": "AAPL"},
-        headers={"Authorization": f"Bearer {access_token}"},
     )
     assert add_response.status_code == 200
     add_payload = add_response.get_json()
     assert add_payload["items"][0]["ticker"] == "AAPL"
 
-    remove_response = client.delete(
-        "/api/market/watchlist/AAPL",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
+    remove_response = client.delete("/api/market/watchlist/AAPL")
     assert remove_response.status_code == 200
     remove_payload = remove_response.get_json()
     assert remove_payload["items"] == []

@@ -3,44 +3,14 @@ import { Info, Minus, Plus, Search, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import StockChart from "../components/ui/Chart";
-import { 
-  MOCK_AAPL_DATA, 
-  MOCK_AAPL_CHART_DATA, 
+import { apiFetch } from "../lib/api";
+import {
+  MOCK_AAPL_DATA,
+  MOCK_AAPL_CHART_DATA,
   MOCK_AAPL_CHART_DATA_BY_PERIOD,
-  type AiCompanyPayload, 
-  type ChartData 
+  type AiCompanyPayload,
+  type ChartData,
 } from "../data/Mockdata";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
-const getAccessToken = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token || token === "null" || token === "undefined") {
-    return null;
-  }
-  return token;
-};
-
-const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken || refreshToken === "null" || refreshToken === "undefined") {
-    return null;
-  }
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: 'include',
-    headers: { Authorization: `Bearer ${refreshToken}` }
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = (await response.json()) as { access_token?: string };
-  if (payload.access_token) {
-    localStorage.setItem("access_token", payload.access_token);
-    return payload.access_token;
-  }
-  return null;
-};
 
 const metricLabels: Array<{ key: keyof NonNullable<AiCompanyPayload["performance_metrics"]>; label: string }> = [
   { key: "past_week_growth", label: "Past Week Growth" },
@@ -108,8 +78,8 @@ export default function MarketStock() {
       };
 
       const { period: apiPeriod, interval } = periodMap[period] || periodMap["1mo"];
-      const chartResponse = await fetch(
-        `${API_BASE_URL}/chart/${normalizedSymbol}?period=${apiPeriod}&interval=${interval}`
+      const chartResponse = await apiFetch(
+        `/chart/${normalizedSymbol}?period=${apiPeriod}&interval=${interval}`
       );
       
       if (chartResponse.ok) {
@@ -141,7 +111,7 @@ export default function MarketStock() {
       setError(null);
       try {
         // Load company data
-        const response = await fetch(`${API_BASE_URL}/market/${normalizedSymbol}`);
+        const response = await apiFetch(`/market/${normalizedSymbol}`);
         if (!response.ok) {
           throw new Error("Failed to load company data.");
         }
@@ -168,28 +138,10 @@ export default function MarketStock() {
     }
     const loadStatus = async () => {
       try {
-        const token = getAccessToken();
-        if (!token) {
+        const response = await apiFetch("/market/watchlist");
+        if (!response.ok) {
           setIsInWatchlist(false);
           return;
-        }
-        let response = await fetch(`${API_BASE_URL}/market/watchlist`, {
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (response.status === 401 || response.status === 422) {
-          const refreshed = await refreshAccessToken();
-          if (!refreshed) {
-            setIsInWatchlist(false);
-            return;
-          }
-          response = await fetch(`${API_BASE_URL}/market/watchlist`, {
-            credentials: 'include',
-            headers: { Authorization: `Bearer ${refreshed}` }
-          });
-        }
-        if (!response.ok) {
-          throw new Error("Failed to load watchlist.");
         }
         const payload = (await response.json()) as { items?: WatchlistItem[] };
         const items = Array.isArray(payload.items) ? payload.items : [];
@@ -209,30 +161,15 @@ export default function MarketStock() {
     void loadChartData(period);
   };
 
-  const ensureAccessToken = async () => {
-    const token = getAccessToken();
-    if (token) {
-      return token;
-    }
-    return await refreshAccessToken();
-  };
-
   const loadAccount = async () => {
     setAccountLoading(true);
     setTradeError(null);
     try {
-      const token = await ensureAccessToken();
-      if (!token) {
+      const response = await apiFetch("/account");
+      if (!response.ok) {
         setAccountCash(null);
         setTradeError("Please log in to place orders.");
         return;
-      }
-      const response = await fetch(`${API_BASE_URL}/account`, {
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!response.ok) {
-        throw new Error("Unable to load account balance.");
       }
       const payload = (await response.json()) as { account?: { cash_balance?: number } };
       setAccountCash(payload.account?.cash_balance ?? 0);
@@ -247,59 +184,18 @@ export default function MarketStock() {
     if (!normalizedSymbol || watchlistBusy) {
       return;
     }
-    let token = getAccessToken();
-    if (!token) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) {
-        setError("Please log in to manage your watchlist.");
-        return;
-      }
-      token = refreshed;
-    }
     setWatchlistBusy(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
+      const response = await apiFetch(
+        `/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
         {
           method: isInWatchlist ? "DELETE" : "POST",
-          credentials: 'include',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            ...(isInWatchlist ? {} : { "Content-Type": "application/json" })
-          },
-          body: isInWatchlist ? undefined : JSON.stringify({ symbol: normalizedSymbol })
+          body: isInWatchlist ? null : JSON.stringify({ symbol: normalizedSymbol }),
         }
       );
-      if (response.status === 401 || response.status === 422) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-          setError("Please log in to manage your watchlist.");
-          return;
-        }
-        const retryResponse = await fetch(
-          `${API_BASE_URL}/market/watchlist${isInWatchlist ? `/${normalizedSymbol}` : ""}`,
-          {
-            method: isInWatchlist ? "DELETE" : "POST",
-            credentials: 'include',
-            headers: {
-              Authorization: `Bearer ${refreshed}`,
-              ...(isInWatchlist ? {} : { "Content-Type": "application/json" })
-            },
-            body: isInWatchlist ? undefined : JSON.stringify({ symbol: normalizedSymbol })
-          }
-        );
-        if (!retryResponse.ok) {
-          throw new Error("Failed to update watchlist.");
-        }
-        const retryPayload = (await retryResponse.json()) as { items?: WatchlistItem[] };
-        const retryItems = Array.isArray(retryPayload.items) ? retryPayload.items : [];
-        setIsInWatchlist(
-          retryItems.some((item) => (item.ticker ?? "").toUpperCase() === normalizedSymbol)
-        );
-        return;
-      }
       if (!response.ok) {
-        throw new Error("Failed to update watchlist.");
+        setError("Please log in to manage your watchlist.");
+        return;
       }
       const payload = (await response.json()) as { items?: WatchlistItem[] };
       const items = Array.isArray(payload.items) ? payload.items : [];
@@ -391,25 +287,11 @@ export default function MarketStock() {
       setTradeError("Fractional shares are not supported yet.");
       return;
     }
-    const token = await ensureAccessToken();
-    if (!token) {
-      setTradeError("Please log in to place orders.");
-      return;
-    }
     setOrderBusy(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/orders`, {
+      const response = await apiFetch("/orders", {
         method: "POST",
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          symbol: normalizedSymbol,
-          side: "BUY",
-          quantity: shares
-        })
+        body: JSON.stringify({ symbol: normalizedSymbol, side: "BUY", quantity: shares }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -425,17 +307,10 @@ export default function MarketStock() {
   };
 
   const handlePriceAlertClick = async (thresholdPercent: number) => {
-    const token = await ensureAccessToken();
-    if (!token) return;
     if (!normalizedSymbol) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/price-alerts`, {
+      const res = await apiFetch("/price-alerts", {
         method: "POST",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ symbol: normalizedSymbol, threshold_percent: thresholdPercent }),
       });
       if (res.ok) {

@@ -3,19 +3,11 @@ import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { apiFetch } from "../lib/api";
 
 type AuthResponse = {
-  access_token: string;
-  refresh_token: string;
   user: { id: number; email: string };
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
-function storeTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem("access_token", accessToken);
-  localStorage.setItem("refresh_token", refreshToken);
-}
 
 export default function Auth() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -30,19 +22,15 @@ export default function Auth() {
     setLoading(true);
     setMessage(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/${mode}`, {
+      const response = await apiFetch(`/auth/${mode}`, {
         method: "POST",
-        credentials: 'include',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: { email, password },
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error ?? "Authentication failed");
       }
       const payload = (await response.json()) as AuthResponse;
-      storeTokens(payload.access_token, payload.refresh_token);
-      localStorage.setItem("user_email", payload.user.email);
       setMessage(`Signed in as ${payload.user.email}`);
       navigate("/home");
     } catch (err) {
@@ -53,24 +41,13 @@ export default function Auth() {
   };
 
   const refreshSession = async () => {
-    const refreshToken = localStorage.getItem("refresh_token");
-    if (!refreshToken) {
-      setMessage("No refresh token stored. Please log in first.");
-      return;
-    }
     setLoading(true);
     setMessage(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${refreshToken}` }
-      });
+      const response = await apiFetch("/auth/refresh", { method: "POST" });
       if (!response.ok) {
         throw new Error("Refresh failed.");
       }
-      const payload = (await response.json()) as { access_token: string };
-      localStorage.setItem("access_token", payload.access_token);
       setMessage("Session refreshed.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Unable to refresh session.");

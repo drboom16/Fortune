@@ -15,16 +15,12 @@ class TestBuyStockMarketOpen:
     
     def test_buy_stock_market_open_instant_fill(self, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
         """Test that buy orders are filled instantly when market is open"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Market is open
         mock_market_open.return_value = True
-        
-        response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
+
+        response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
         
         assert response.status_code == 200
         data = response.get_json()
@@ -42,14 +38,12 @@ class TestBuyStockMarketOpen:
     
     def test_buy_stock_insufficient_funds(self, client, authenticated_user, mock_quote, mock_market_open):
         """Test buying stock with insufficient cash"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
         mock_market_open.return_value = True
-        
-        response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10000
-        }, headers=headers)
+
+        response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10000},
+        )
         
         assert response.status_code == 400
         data = response.get_json()
@@ -61,16 +55,12 @@ class TestBuyStockMarketClosed:
     
     def test_buy_stock_market_closed_creates_pending(self, app, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
         """Test that buy orders are PENDING when market is closed"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Market is closed
         mock_market_open.return_value = False
-        
-        response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
+
+        response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
         
         assert response.status_code == 200
         data = response.get_json()
@@ -90,15 +80,12 @@ class TestBuyStockMarketClosed:
     
     def test_pending_order_still_validates_funds(self, client, authenticated_user, mock_quote, mock_market_open):
         """Test that pending orders still validate available funds"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
         mock_market_open.return_value = False
-        
-        # Try to buy more than we can afford
-        response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10000
-        }, headers=headers)
+
+        response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10000},
+        )
         
         assert response.status_code == 400
         assert 'Insufficient cash' in response.get_json()['error']
@@ -109,24 +96,19 @@ class TestSellStockMarketOpen:
     
     def test_sell_stock_market_open_instant_fill(self, app, client, authenticated_user, mock_quote, mock_current_price, mock_market_open, mock_company_name):
         """Test that sell orders are filled instantly when market is open"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
         mock_market_open.return_value = True
-        
-        # Buy stock first
-        buy_response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
-        buy_order_id = buy_response.get_json()['order']['id']
-        
-        # Sell it at higher price
+
+        buy_response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
+        buy_order_id = buy_response.get_json()["order"]["id"]
+
         mock_current_price.return_value = 160.00
-        response = client.post('/api/sell', json={
-            'id': buy_order_id,
-            'symbol': 'AAPL',
-            'quantity': 10
-        }, headers=headers)
+        response = client.post(
+            "/api/sell",
+            json={"id": buy_order_id, "symbol": "AAPL", "quantity": 10},
+        )
         
         assert response.status_code == 200
         data = response.get_json()
@@ -147,14 +129,12 @@ class TestSellStockMarketOpen:
     
     def test_sell_stock_insufficient_shares(self, client, authenticated_user, mock_current_price, mock_market_open):
         """Test selling more shares than owned"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
         mock_market_open.return_value = True
-        
-        response = client.post('/api/sell', json={
-            'id': 1,
-            'symbol': 'AAPL',
-            'quantity': 10
-        }, headers=headers)
+
+        response = client.post(
+            "/api/sell",
+            json={"id": 1, "symbol": "AAPL", "quantity": 10},
+        )
         
         assert response.status_code == 400
         assert 'Insufficient shares' in response.get_json()['error']
@@ -165,28 +145,20 @@ class TestSellStockMarketClosed:
     
     def test_sell_stock_market_closed_creates_pending(self, app, client, authenticated_user, mock_quote, mock_current_price, mock_market_open, mock_company_name):
         """Test that sell orders are PENDING when market is closed"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Buy stock when market is open
         mock_market_open.return_value = True
-        buy_response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
-        buy_order_id = buy_response.get_json()['order']['id']
-        initial_cash = buy_response.get_json()['account']['cash_balance']
-        
-        # Market closes
+        buy_response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
+        buy_order_id = buy_response.get_json()["order"]["id"]
+        initial_cash = buy_response.get_json()["account"]["cash_balance"]
+
         mock_market_open.return_value = False
-        
-        # Try to sell
         mock_current_price.return_value = 160.00
-        response = client.post('/api/sell', json={
-            'id': buy_order_id,
-            'symbol': 'AAPL',
-            'quantity': 10
-        }, headers=headers)
+        response = client.post(
+            "/api/sell",
+            json={"id": buy_order_id, "symbol": "AAPL", "quantity": 10},
+        )
         
         assert response.status_code == 200
         data = response.get_json()
@@ -216,16 +188,12 @@ class TestOrderProcessor:
     def test_process_pending_buy_orders(self, app, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
         """Test that pending BUY orders are processed when market opens"""
         from app.order_processor import process_pending_orders
-        
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Create order when market is closed
+
         mock_market_open.return_value = False
-        response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
+        response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
         
         order_id = response.get_json()['order']['id']
         
@@ -256,26 +224,20 @@ class TestOrderProcessor:
     def test_process_pending_sell_orders(self, app, client, authenticated_user, mock_quote, mock_current_price, mock_market_open, mock_company_name):
         """Test that pending SELL orders are processed when market opens"""
         from app.order_processor import process_pending_orders
-        
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Buy stock when market is open
+
         mock_market_open.return_value = True
-        buy_response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
-        buy_order_id = buy_response.get_json()['order']['id']
-        
-        # Create sell order when market is closed
+        buy_response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
+        buy_order_id = buy_response.get_json()["order"]["id"]
+
         mock_market_open.return_value = False
         mock_current_price.return_value = 160.00
-        sell_response = client.post('/api/sell', json={
-            'id': buy_order_id,
-            'symbol': 'AAPL',
-            'quantity': 10
-        }, headers=headers)
+        sell_response = client.post(
+            "/api/sell",
+            json={"id": buy_order_id, "symbol": "AAPL", "quantity": 10},
+        )
         sell_order_id = sell_response.get_json()['order']['id']
         
         # Verify sell order is PENDING
@@ -310,16 +272,12 @@ class TestOrderProcessor:
         """Test that processor rejects pending orders if funds are no longer available"""
         from app.order_processor import process_pending_orders
         from app.models import Account
-        
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Create order when market is closed
+
         mock_market_open.return_value = False
-        response = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
+        response = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
         order_id = response.get_json()['order']['id']
         
         # Simulate user spending all their cash elsewhere
@@ -346,36 +304,19 @@ class TestOrderProcessor:
     def test_process_close_all_orders(self, app, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
         """Test that when close all orders are called, all open orders are closed"""
         from app.models import Position
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Create three orders when market is open
+
         mock_market_open.return_value = True
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 100
-        }, headers=headers)
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 50
-        }, headers=headers)
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 25
-        }, headers=headers)
+        client.post("/api/orders", json={"symbol": "AAPL", "side": "BUY", "quantity": 100})
+        client.post("/api/orders", json={"symbol": "AAPL", "side": "BUY", "quantity": 50})
+        client.post("/api/orders", json={"symbol": "AAPL", "side": "BUY", "quantity": 25})
 
         with app.app_context():
             position = db.session.execute(
-                db.select(Position).filter_by(symbol='AAPL')
+                db.select(Position).filter_by(symbol="AAPL")
             ).scalar_one()
             assert position.quantity == 175
 
-        # Close all orders
-        response = client.post('/api/portfolio/breakdown/close-all', json={
-            'symbol': 'AAPL'
-        }, headers=headers)
+        response = client.post("/api/portfolio/breakdown/close-all", json={"symbol": "AAPL"})
         
         assert response.status_code == 200
         
@@ -390,26 +331,11 @@ class TestOrderProcessor:
         """Test that when close all orders are called, all open orders are closed"""
         from app.models import Order
         from app.order_processor import process_pending_orders
-        
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Create three orders when market is closed
+
         mock_market_open.return_value = False
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 100
-        }, headers=headers)
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 50
-        }, headers=headers)
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 25
-        }, headers=headers)
+        client.post("/api/orders", json={"symbol": "AAPL", "side": "BUY", "quantity": 100})
+        client.post("/api/orders", json={"symbol": "AAPL", "side": "BUY", "quantity": 50})
+        client.post("/api/orders", json={"symbol": "AAPL", "side": "BUY", "quantity": 25})
 
         with app.app_context():
             orders = db.session.execute(
@@ -431,13 +357,9 @@ class TestOrderProcessor:
             ).scalars().all()
             assert len(orders) == 3
 
-        # Market closes
         mock_market_open.return_value = False
 
-        # Close AAPL position (close all orders)
-        response = client.post('/api/portfolio/breakdown/close-all', json={
-            'symbol': 'AAPL'
-        }, headers=headers)
+        response = client.post("/api/portfolio/breakdown/close-all", json={"symbol": "AAPL"})
 
         assert response.status_code == 200
 
@@ -472,32 +394,25 @@ class TestPortfolioBreakdown:
     
     def test_breakdown_shows_only_open_orders(self, client, authenticated_user, mock_quote, mock_current_price, mock_market_open, mock_company_name):
         """Test that breakdown only shows OPEN orders (not CLOSED or PENDING)"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
         mock_market_open.return_value = True
-        
-        # Buy twice
-        buy1 = client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
-        buy1_id = buy1.get_json()['order']['id']
-        
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 5
-        }, headers=headers)
-        
-        # Sell first order
-        client.post('/api/sell', json={
-            'id': buy1_id,
-            'symbol': 'AAPL',
-            'quantity': 10
-        }, headers=headers)
-        
-        # Get breakdown
-        response = client.get('/api/portfolio/breakdown/AAPL', headers=headers)
+
+        buy1 = client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
+        buy1_id = buy1.get_json()["order"]["id"]
+
+        client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 5},
+        )
+
+        client.post(
+            "/api/sell",
+            json={"id": buy1_id, "symbol": "AAPL", "quantity": 10},
+        )
+
+        response = client.get("/api/portfolio/breakdown/AAPL")
         data = response.get_json()
         
         # Should only show second order (first is CLOSED)
@@ -506,26 +421,19 @@ class TestPortfolioBreakdown:
     
     def test_breakdown_excludes_pending_orders(self, client, authenticated_user, mock_quote, mock_market_open, mock_company_name):
         """Test that breakdown doesn't show PENDING orders"""
-        headers = {'Authorization': f'Bearer {authenticated_user["access_token"]}'}
-        
-        # Create filled order
         mock_market_open.return_value = True
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 10
-        }, headers=headers)
-        
-        # Create pending order
+        client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 10},
+        )
+
         mock_market_open.return_value = False
-        client.post('/api/orders', json={
-            'symbol': 'AAPL',
-            'side': 'BUY',
-            'quantity': 5
-        }, headers=headers)
-        
-        # Get breakdown
-        response = client.get('/api/portfolio/breakdown/AAPL', headers=headers)
+        client.post(
+            "/api/orders",
+            json={"symbol": "AAPL", "side": "BUY", "quantity": 5},
+        )
+
+        response = client.get("/api/portfolio/breakdown/AAPL")
         data = response.get_json()
         
         # Should only show the filled order

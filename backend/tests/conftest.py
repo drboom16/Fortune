@@ -34,21 +34,16 @@ def client(app):
 
 @pytest.fixture
 def authenticated_user(app, client):
-    """Create a user and return authentication tokens"""
+    """Create a user via register; client receives httpOnly cookies for auth."""
     with app.app_context():
-        # Register a new user
-        response = client.post('/api/auth/register', json={
-            'email': 'test@example.com',
-            'password': 'testpass123'
-        })
+        response = client.post(
+            "/api/auth/register",
+            json={"email": "test@example.com", "password": "testpass123"},
+        )
         assert response.status_code == 201
         data = response.get_json()
-        
-        return {
-            'user_id': data['user']['id'],
-            'access_token': data['access_token'],
-            'refresh_token': data['refresh_token']
-        }
+        assert "user" in data
+        return {"user_id": data["user"]["id"]}
 
 
 @pytest.fixture

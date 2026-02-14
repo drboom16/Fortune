@@ -4,6 +4,7 @@ import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 type AiWatchlistItem = {
   ticker: string;
@@ -11,36 +12,6 @@ type AiWatchlistItem = {
   value: number;
   change_1d: number;
   "52w_range": [number, number];
-};
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-const getAccessToken = () => {
-  const token = localStorage.getItem("access_token");
-  if (!token || token === "null" || token === "undefined") {
-    return null;
-  }
-  return token;
-};
-
-const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken || refreshToken === "null" || refreshToken === "undefined") {
-    return null;
-  }
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: 'include',
-    headers: { Authorization: `Bearer ${refreshToken}` }
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = (await response.json()) as { access_token?: string };
-  if (payload.access_token) {
-    localStorage.setItem("access_token", payload.access_token);
-    return payload.access_token;
-  }
-  return null;
 };
 
 export default function Watchlist() {
@@ -53,29 +24,11 @@ export default function Watchlist() {
   const loadWatchlist = async () => {
     setLoading(true);
     try {
-      const token = getAccessToken();
-      if (!token) {
+      const response = await apiFetch("/market/watchlist");
+      if (!response.ok) {
         setItems([]);
         setLastUpdated(new Date());
         return;
-      }
-      let response = await fetch(`${API_BASE_URL}/market/watchlist`, {
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.status === 401 || response.status === 422) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-          setItems([]);
-          return;
-        }
-        response = await fetch(`${API_BASE_URL}/market/watchlist`, {
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${refreshed}` }
-        });
-      }
-      if (!response.ok) {
-        throw new Error("Failed to fetch watchlist.");
       }
       const payload = (await response.json()) as { items?: AiWatchlistItem[] };
       const nextItems = Array.isArray(payload.items) ? payload.items : [];

@@ -8,6 +8,9 @@ from flask_jwt_extended import (
     create_refresh_token,
     get_jwt_identity,
     jwt_required,
+    set_access_cookies,
+    set_refresh_cookies,
+    unset_jwt_cookies,
 )
 
 from .extensions import bcrypt, db
@@ -111,16 +114,10 @@ def register():
 
     access_token = create_access_token(identity=str(user.id))
     refresh_token = create_refresh_token(identity=str(user.id))
-    return (
-        jsonify(
-            {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "user": user.to_dict(),
-            }
-        ),
-        201,
-    )
+    response = jsonify({"user": user.to_dict()})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    return response, 201
 
 
 @api.post("/auth/login")
@@ -134,25 +131,9 @@ def login():
 
     access_token = create_access_token(identity=str(user.id))
     refresh_token = create_refresh_token(identity=str(user.id))
-    
-    response = jsonify(
-        {
-            "access_token": access_token, 
-            "refresh_token": refresh_token, 
-            "user": user.to_dict()
-        }
-    )
-    
-    response.set_cookie(
-        'refresh_token',
-        refresh_token,
-        httponly=True,
-        secure=False, # set to True in production with HTTPS
-        samesite='Lax',
-        max_age=7*24*60*60, # 7 days
-        path='/'
-    )
-
+    response = jsonify({"user": user.to_dict()})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
     return response, 200
 
 
@@ -161,34 +142,36 @@ def login():
 def refresh():
     user_id = int(get_jwt_identity())
     access_token = create_access_token(identity=str(user_id))
-    return jsonify({"access_token": access_token})
+    refresh_token = create_refresh_token(identity=str(user_id))
+    response = jsonify({"user": {"id": user_id}})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    return response, 200
 
 
 @api.post("/auth/logout")
-@jwt_required()
 def logout():
-    access_token = request.headers.get("Authorization")
-    refresh_token = request.cookies.get("refresh_token")
-
-    if access_token and access_token.startswith('Bearer '):
-        access_token = access_token[7:]
-        blacklisted_tokens.add(access_token)
-
-    if refresh_token:
-        blacklisted_tokens.add(refresh_token)
-
-    response = jsonify({'message': 'Successfully logged out'})
-    response.set_cookie(
-        'refresh_token',
-        '',
-        httponly=True,
-        secure=False, # set to True in production with HTTPS
-        samesite='Lax',
-        expires=0,
-        path='/'
-    )
-
+    from flask_jwt_extended import get_jwt, verify_jwt_in_request
+    try:
+        verify_jwt_in_request(optional=True)
+        jti = get_jwt().get("jti")
+        if jti:
+            blacklisted_tokens.add(jti)
+    except Exception:
+        pass
+    response = jsonify({"message": "Successfully logged out"})
+    unset_jwt_cookies(response)
     return response, 200
+
+
+@api.get("/auth/me")
+@jwt_required()
+def auth_me():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"user": user.to_dict()})
 
 
 @api.get("/market/watchlist")

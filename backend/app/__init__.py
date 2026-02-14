@@ -22,6 +22,23 @@ def create_app(config=None):  # ← Add config parameter
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "change-me")
 
+    # JWT HTTPOnly cookie configuration (XSS-resistant, tokens never exposed to JS)
+    app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+    app.config["JWT_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production"
+    app.config["JWT_COOKIE_HTTPONLY"] = True
+    app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 15 * 60  # 15 minutes
+    app.config["JWT_REFRESH_TOKEN_EXPIRES"] = 30 * 24 * 60 * 60  # 30 days
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False  # SameSite=Lax mitigates most CSRF
+    app.config["JWT_ACCESS_COOKIE_NAME"] = "access_token"
+    app.config["JWT_REFRESH_COOKIE_NAME"] = "refresh_token"
+    app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
+    app.config["JWT_REFRESH_COOKIE_PATH"] = "/"
+
+    # CORS: must specify origins (not *) when using credentials
+    cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    app.config["CORS_SUPPORTS_CREDENTIALS"] = True
+
     # Apply config overrides BEFORE initializing extensions
     if config:
         app.config.update(config)
@@ -29,7 +46,15 @@ def create_app(config=None):  # ← Add config parameter
     db.init_app(app)
     jwt.init_app(app)
     bcrypt.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+    cors.init_app(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": cors_origins,
+                "supports_credentials": True,
+            }
+        },
+    )
 
     app.register_blueprint(api)
 

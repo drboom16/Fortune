@@ -3,35 +3,18 @@ import { Briefcase, Eye, Home, LogOut, PanelLeft } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Button } from "./components/ui/button";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+import { apiFetch } from "./lib/api";
 
 const navBase = "flex items-center rounded-xl py-4 text-left text-base font-medium";
 const navPad = (open: boolean) => (open ? "px-5" : "justify-center px-0");
 
 const logout = async () => {
-  const accessToken = localStorage.getItem("access_token");
-  const refreshToken = localStorage.getItem("refresh_token");
-
-  if (!accessToken || !refreshToken) return;
-
   try {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
-      method: "POST",
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-    });
+    await apiFetch("/auth/logout", { method: "POST" });
   } catch (err) {
-    console.error('Logout error: ', err);
-  } finally {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user_email");
+    console.error("Logout error:", err);
   }
-}
+};
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -42,7 +25,10 @@ export default function App() {
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setUserEmail(localStorage.getItem("user_email"));
+    apiFetch("/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data?.user?.email && setUserEmail(data.user.email))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
