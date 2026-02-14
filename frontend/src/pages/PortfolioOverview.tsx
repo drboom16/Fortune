@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { TableSkeleton } from "../components/ui/table-skeleton";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
 import { apiFetch } from "../lib/api";
@@ -113,47 +113,53 @@ export default function PortfolioOverview() {
       </header>
 
       <section className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold">My Portfolio</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === "positions" ? "default" : "secondary"}
-            size="sm"
-            onClick={() => setViewMode("positions")}
-            className={viewMode === "positions" ? "bg-black text-white hover:bg-black/90" : ""}
-          >
-            All positions
-          </Button>
-          <Button
-            variant={viewMode === "pending" ? "default" : "secondary"}
-            size="sm"
-            onClick={() => setViewMode("pending")}
-            className={viewMode === "pending" ? "bg-black text-white hover:bg-black/90" : ""}
-          >
-            Pending orders
-          </Button>
-        </div>
-      </section>
+            <h1 className="text-2xl font-semibold">My Portfolio</h1>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "positions" ? "default" : "secondary"}
+                size="sm"
+                onClick={() => setViewMode("positions")}
+                className={viewMode === "positions" ? "bg-black text-white hover:bg-black/90" : ""}
+              >
+                All positions
+              </Button>
+              <Button
+                variant={viewMode === "pending" ? "default" : "secondary"}
+                size="sm"
+                onClick={() => setViewMode("pending")}
+                className={viewMode === "pending" ? "bg-black text-white hover:bg-black/90" : ""}
+              >
+                Pending orders
+              </Button>
+            </div>
+          </section>
 
-      <div className="py-8">
-        {viewMode === "positions" ? (
-          <>
-            {loading ? (
-              <div className="grid gap-3 py-6">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <Skeleton key={index} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : positionsPayload && positionsPayload.length > 0 ? (
+          <div className="py-8">
+            {viewMode === "positions" ? (
+              <>
+                {loading ? (
+                  <TableSkeleton
+                    columns={[
+                      { header: "Asset", className: "w-[180px]" },
+                      { header: "Price", className: "w-[100px] text-center" },
+                      { header: "Units", className: "w-[80px] text-center" },
+                      { header: "Avg. Open", className: "w-[100px] text-center" },
+                      { header: "P/L", className: "w-[100px] text-center" },
+                      { header: "P/L(%)", className: "w-[90px] text-center" },
+                      { header: "Net Value", className: "w-[110px] text-right" },
+                    ]}
+                  />
+                ) : positionsPayload && positionsPayload.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 h-16">
-                    <TableHead>Asset</TableHead>
-                    <TableHead className="text-center">Price</TableHead>
-                    <TableHead className="text-center">Units</TableHead>
-                    <TableHead className="text-center">Avg. Open</TableHead>
-                    <TableHead className="text-center">P/L</TableHead>
-                    <TableHead className="text-center">P/L(%)</TableHead>
-                    <TableHead className="text-right">Net Value</TableHead>
+                    <TableHead className="w-[180px]">Asset</TableHead>
+                    <TableHead className="w-[100px] text-center">Price</TableHead>
+                    <TableHead className="w-[80px] text-center">Units</TableHead>
+                    <TableHead className="w-[100px] text-center">Avg. Open</TableHead>
+                    <TableHead className="w-[100px] text-center">P/L</TableHead>
+                    <TableHead className="w-[90px] text-center">P/L(%)</TableHead>
+                    <TableHead className="w-[110px] text-right">Net Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -193,7 +199,7 @@ export default function PortfolioOverview() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
+              <div className="flex flex-col items-center justify-center rounded-2xl bg-card text-center h-[calc(100vh-22rem)]">
                 <img src="/pi-chart.png" alt="Portfolio chart" className="h-64 w-64" />
                 <h2 className="mt-6 text-xl font-semibold">Your portfolio is empty</h2>
                 <p className="mt-2 max-w-lg text-sm text-muted-foreground">
@@ -206,21 +212,26 @@ export default function PortfolioOverview() {
         ) : (
           <>
             {pendingOrdersLoading ? (
-              <div className="grid gap-3 py-6">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <Skeleton key={index} className="h-14 w-full" />
-                ))}
-              </div>
+              <TableSkeleton
+                columns={[
+                  { header: "Asset", className: "w-[180px]" },
+                  { header: "Side", className: "w-[90px] text-center" },
+                  { header: "Quantity", className: "w-[90px] text-center" },
+                  { header: "Price", className: "w-[90px] text-center" },
+                  { header: "Status", className: "w-[100px] text-center" },
+                  { header: "Order Entry Time", className: "w-[160px] text-right" },
+                ]}
+              />
             ) : pendingOrders && pendingOrders.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 h-16">
-                    <TableHead>Asset</TableHead>
-                    <TableHead className="text-center">Side</TableHead>
-                    <TableHead className="text-center">Quantity</TableHead>
-                    <TableHead className="text-center">Price</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Order Entry Time</TableHead>
+                    <TableHead className="w-[180px]">Asset</TableHead>
+                    <TableHead className="w-[90px] text-center">Side</TableHead>
+                    <TableHead className="w-[90px] text-center">Quantity</TableHead>
+                    <TableHead className="w-[90px] text-center">Price</TableHead>
+                    <TableHead className="w-[100px] text-center">Status</TableHead>
+                    <TableHead className="w-[160px] text-right">Order Entry Time</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -263,7 +274,7 @@ export default function PortfolioOverview() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
+              <div className="flex flex-col items-center justify-center rounded-2xl bg-card text-center h-[calc(100vh-22rem)]">
                 <img src="/pi-chart.png" alt="Portfolio chart" className="h-64 w-64" />
                 <h2 className="mt-6 text-xl font-semibold">No pending orders</h2>
                 <p className="mt-2 max-w-lg text-sm text-muted-foreground">
@@ -273,32 +284,32 @@ export default function PortfolioOverview() {
             )}
           </>
         )}
-      </div>
+          </div>
 
-      {/* Bottom Section: Portfolio Value */}
-      <div className="fixed bottom-0 z-30 left-[var(--sidebar-width)] right-0 border-t border-border/40 bg-card/95 backdrop-blur transition-[left] duration-300 ease-in-out">
-        <div className="grid grid-cols-7 items-center gap-2 px-8 py-4 text-center">
-          <div>
-            <div className="text-lg font-semibold">${(accountCash ?? 0).toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground">Cash Available</div>
+          {/* Bottom Section: Portfolio Value */}
+          <div className="fixed bottom-0 z-30 left-[var(--sidebar-width)] right-0 border-t border-border/40 bg-card/95 backdrop-blur transition-[left] duration-300 ease-in-out">
+            <div className="grid grid-cols-7 items-center gap-2 px-8 py-4 text-center">
+              <div>
+                <div className="text-lg font-semibold">${(accountCash ?? 0).toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground">Cash Available</div>
+              </div>
+              <div className="text-2xl text-muted-foreground">+</div>
+              <div>
+                <div className="text-lg font-semibold">${(totalInvested ?? 0).toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground">Total Invested</div>
+              </div>
+              <div className="text-2xl text-muted-foreground">+</div>
+              <div>
+                <div className={`text-lg font-semibold ${(profitLoss ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{(profitLoss ?? 0) >= 0 ? "$" : "-$"}{Math.abs(profitLoss ?? 0).toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground">Profit/Loss</div>
+              </div>
+              <div className="text-2xl text-muted-foreground">=</div>
+              <div>
+                <div className="text-lg font-semibold">${(portfolioValue ?? 0).toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground">Portfolio Value</div>
+              </div>
+            </div>
           </div>
-          <div className="text-2xl text-muted-foreground">+</div>
-          <div>
-            <div className="text-lg font-semibold">${(totalInvested ?? 0).toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground">Total Invested</div>
-          </div>
-          <div className="text-2xl text-muted-foreground">+</div>
-          <div>
-            <div className={`text-lg font-semibold ${(profitLoss ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{(profitLoss ?? 0) >= 0 ? "$" : "-$"}{Math.abs(profitLoss ?? 0).toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground">Profit/Loss</div>
-          </div>
-          <div className="text-2xl text-muted-foreground">=</div>
-          <div>
-            <div className="text-lg font-semibold">${(portfolioValue ?? 0).toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground">Portfolio Value</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

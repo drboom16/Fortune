@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { TableSkeleton } from "../components/ui/table-skeleton";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
 import { apiFetch } from "../lib/api";
@@ -72,7 +72,7 @@ export default function PortfolioBreakdown() {
     try {
       const response = await apiFetch("/sell", {
         method: "POST",
-        body: JSON.stringify({ id, symbol, quantity }),
+        body: { id, symbol, quantity },
       });
       if (!response.ok) throw new Error("Failed to sell stock.");
       setCloseTradeModalActive(false);
@@ -88,7 +88,7 @@ export default function PortfolioBreakdown() {
     if (!order) return;
     const response = await apiFetch("/portfolio/breakdown/thresholds", {
       method: "POST",
-      body: JSON.stringify({ id: order.id, stop_loss_price: parseFloat(stopLossPrice), take_profit_price: parseFloat(takeProfitPrice) }),
+      body: { id: order.id, stop_loss_price: parseFloat(stopLossPrice), take_profit_price: parseFloat(takeProfitPrice) },
     });
     if (!response.ok) throw new Error("Failed to update thresholds.");
     handleCloseModal();
@@ -97,7 +97,7 @@ export default function PortfolioBreakdown() {
   const handleCloseAllTrades = async () => {
     const response = await apiFetch("/portfolio/breakdown/close-all", {
       method: "POST",
-      body: JSON.stringify({ symbol: symbol }),
+      body: { symbol: symbol },
     });
     if (!response.ok) throw new Error("Failed to close all trades.");
     setCloseAllTradesModalActive(false);
@@ -156,21 +156,21 @@ export default function PortfolioBreakdown() {
       </header>
 
       <section className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-3">
-          <Button className="text-2xl font-semibold bg-white text-black hover:bg-white/80" onClick={() => navigate("/portfolio/overview")}>
-            <ChevronLeft className="h-6 w-6 translate-x-[-18px] translate-y-[-4px]" />
-            <span className="translate-x-[-24px] translate-y-[-4px]">Back</span>
-          </Button>
-        </div>
-      </section>
+            <div className="flex items-center gap-3">
+              <Button className="text-2xl font-semibold bg-white text-black hover:bg-white/80" onClick={() => navigate("/portfolio/overview")}>
+                <ChevronLeft className="h-6 w-6 translate-x-[-18px] translate-y-[-4px]" />
+                <span className="translate-x-[-24px] translate-y-[-4px]">Back</span>
+              </Button>
+            </div>
+          </section>
       {orderOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-background/80"
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-modal-backdrop"
             onClick={() => handleCloseModal()}
           />
 
-          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
+          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6 shadow-xl animate-modal-content">
             
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <div>
@@ -296,26 +296,35 @@ export default function PortfolioBreakdown() {
       )}
 
       <div className="py-8 translate-y-[-7px]">
-        {loading ? (
-          <div className="grid gap-3 py-6">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full" />
-            ))}
-          </div>
+        {loading && orderHistory === null ? (
+          <TableSkeleton
+            columns={[
+              { header: "Asset", className: "w-[140px]" },
+              { header: "Units", className: "w-[70px] text-right" },
+              { header: "Price", className: "w-[80px] text-right" },
+              { header: "SL", className: "w-[70px] text-center" },
+              { header: "TP", className: "w-[70px] text-center" },
+              { header: "Avg. Open", className: "w-[90px] text-right" },
+              { header: "P/L", className: "w-[80px] text-right" },
+              { header: "P/L(%)", className: "w-[80px] text-right" },
+              { header: "Net Value", className: "w-[90px] text-right" },
+              { header: "", className: "w-[100px] text-center" },
+            ]}
+          />
         ) : orderHistory && orderHistory.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 h-16">
-                <TableHead>Asset</TableHead>
-                <TableHead className="text-right">Units</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-center">SL</TableHead>
-                <TableHead className="text-center">TP</TableHead>
-                <TableHead className="text-right">Avg. Open</TableHead>
-                <TableHead className="text-right">P/L</TableHead>
-                <TableHead className="text-right">P/L(%)</TableHead>
-                <TableHead className="text-right">Net Value</TableHead>
-                <TableHead className="text-center">
+                <TableHead className="w-[140px]">Asset</TableHead>
+                <TableHead className="w-[70px] text-right">Units</TableHead>
+                <TableHead className="w-[80px] text-right">Price</TableHead>
+                <TableHead className="w-[70px] text-center">SL</TableHead>
+                <TableHead className="w-[70px] text-center">TP</TableHead>
+                <TableHead className="w-[90px] text-right">Avg. Open</TableHead>
+                <TableHead className="w-[80px] text-right">P/L</TableHead>
+                <TableHead className="w-[80px] text-right">P/L(%)</TableHead>
+                <TableHead className="w-[90px] text-right">Net Value</TableHead>
+                <TableHead className="w-[100px] text-center">
                   <Button className="w-30 h-8 text-black border border-black rounded-full bg-transparent transition-colors duration-300 ease-in-out hover:bg-black hover:text-white hover:border-black" onClick={(e) => {
                     e.stopPropagation();
                     setCloseAllTradesModalActive(true);
@@ -385,11 +394,11 @@ export default function PortfolioBreakdown() {
       {closeTradeModalActive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-background/80"
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-modal-backdrop"
             onClick={() => setCloseTradeModalActive(false)}
           />
 
-          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
+          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6 shadow-xl animate-modal-content">
             
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <div>
@@ -488,11 +497,11 @@ export default function PortfolioBreakdown() {
       {closeAllTradesModalActive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-background/80"
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-modal-backdrop"
             onClick={() => setCloseAllTradesModalActive(false)}
           />
 
-          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6">
+          <div className="relative z-10 w-full max-w-md border border-border bg-card rounded-xl p-6 shadow-xl animate-modal-content">
             
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <div>

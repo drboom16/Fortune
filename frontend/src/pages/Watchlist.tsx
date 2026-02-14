@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { TableSkeleton } from "../components/ui/table-skeleton";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
@@ -14,11 +14,41 @@ type AiWatchlistItem = {
   "52w_range": [number, number];
 };
 
+type ChartPoint = { time: number; close: number };
+
+function MiniPriceChart({ data, positive }: { data: ChartPoint[]; positive: boolean }) {
+  if (!data.length) {
+    return (
+      <div className="h-10 w-24 flex items-center justify-center text-[10px] text-muted-foreground">
+        —
+      </div>
+    );
+  }
+  const closes = data.map((d) => d.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const points = data
+    .map((d, i) => {
+      const x = (i / (data.length - 1 || 1)) * 100;
+      const y = 100 - ((d.close - min) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const stroke = positive ? "rgb(16 185 129)" : "rgb(244 63 94)";
+  return (
+    <svg className="h-10 w-24 shrink-0" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <polyline fill="none" stroke={stroke} strokeWidth="2" points={points} />
+    </svg>
+  );
+}
+
 export default function Watchlist() {
   const [items, setItems] = useState<AiWatchlistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [chartDataByTicker, setChartDataByTicker] = useState<Record<string, ChartPoint[]>>({});
   const navigate = useNavigate();
 
   const loadWatchlist = async () => {
@@ -44,6 +74,31 @@ export default function Watchlist() {
   useEffect(() => {
     void loadWatchlist();
   }, []);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setChartDataByTicker({});
+      return;
+    }
+    const loadCharts = async () => {
+      const results = await Promise.allSettled(
+        items.map(async (item) => {
+          const res = await apiFetch(`/chart/${item.ticker}?period=1mo&interval=1d`);
+          if (!res.ok) return { ticker: item.ticker, data: [] };
+          const json = (await res.json()) as { data?: ChartPoint[] };
+          return { ticker: item.ticker, data: json.data ?? [] };
+        })
+      );
+      const next: Record<string, ChartPoint[]> = {};
+      results.forEach((r) => {
+        if (r.status === "fulfilled") {
+          next[r.value.ticker] = r.value.data;
+        }
+      });
+      setChartDataByTicker(next);
+    };
+    void loadCharts();
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toUpperCase();
@@ -86,35 +141,6 @@ export default function Watchlist() {
     });
   }, [filteredItems]);
 
-  const renderSparkline = (symbol: string, positive: boolean) => {
-    const points = Array.from({ length: 14 }).map((_, index) => {
-      const seed = symbol
-        .split("")
-        .reduce((total, char) => total + char.charCodeAt(0), 0);
-      const value = Math.sin(index + seed) * 10 + (positive ? 40 : 30);
-      return value;
-    });
-    const max = Math.max(...points);
-    const min = Math.min(...points);
-    const normalized = points
-      .map((value, index) => {
-        const x = (index / (points.length - 1)) * 100;
-        const y = 100 - ((value - min) / (max - min || 1)) * 100;
-        return `${x},${y}`;
-      })
-      .join(" ");
-    return (
-      <svg className="h-10 w-24" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <polyline
-          fill="none"
-          stroke={positive ? "rgb(34 197 94)" : "rgb(239 68 68)"}
-          strokeWidth="4"
-          points={normalized}
-        />
-      </svg>
-    );
-  };
-
   const handleClick = (ticker: string) => {
     navigate(`/market/${ticker}`);
   };
@@ -130,28 +156,34 @@ export default function Watchlist() {
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">My Watchlist</h1>
-        </div>
-      </div>
-
-      <section className="py-8 translate-y-[-32px]">
-        {loading ? (
-          <div className="grid gap-3 py-6">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full" />
-            ))}
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold">My Watchlist</h1>
+            </div>
           </div>
-        ) : watchlistItems.length ? (
+          {!watchlistItems.length && !loading && <div className="h-6 shrink-0" aria-hidden />}
+
+          <section className="py-8 translate-y-[-32px]">
+          {loading ? (
+            <TableSkeleton
+              columns={[
+                { header: "Markets", className: "w-[22%]" },
+                { header: "Change 1D", className: "text-center w-[12%]" },
+                { header: "Chart", className: "text-center w-[120px]" },
+                { header: "Short", className: "text-center w-[12%]" },
+                { header: "Buy", className: "text-center w-[12%]" },
+                { header: "52W Range", className: "text-center w-[22%]" },
+              ]}
+            />
+          ) : watchlistItems.length ? (
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 h-16">
-                <TableHead>Markets</TableHead>
-                <TableHead>Change 1D</TableHead>
-                <TableHead />
-                <TableHead>Short</TableHead>
-                <TableHead>Buy</TableHead>
-                <TableHead>52W Range</TableHead>
+                <TableHead className="w-[22%]">Markets</TableHead>
+                <TableHead className="text-center w-[12%]">Change 1D</TableHead>
+                <TableHead className="text-center w-[120px]">Chart</TableHead>
+                <TableHead className="text-center w-[12%]">Short</TableHead>
+                <TableHead className="text-center w-[12%]">Buy</TableHead>
+                <TableHead className="text-center w-[22%]">52W Range</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -168,7 +200,7 @@ export default function Watchlist() {
                         {quote.company_name}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <div
                         className={`text-sm font-semibold ${
                           positive ? "text-emerald-500" : "text-rose-500"
@@ -182,22 +214,24 @@ export default function Watchlist() {
                         {changePercent.toFixed(2)}%
                       </div>
                     </TableCell>
-                    <TableCell>{renderSparkline(quote.ticker, positive)}</TableCell>
-                    <TableCell>
-                      <div className="rounded-full bg-muted px-4 py-2 text-sm font-semibold">
+                    <TableCell className="text-center flex justify-center">
+                      <MiniPriceChart data={chartDataByTicker[quote.ticker] ?? []} positive={positive} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="rounded-full bg-muted px-4 py-2 text-sm font-semibold mx-auto">
                         {quote.short.toFixed(2)}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="rounded-full bg-muted px-4 py-2 text-sm font-semibold">
+                    <TableCell className="text-center">
+                      <div className="rounded-full bg-muted px-4 py-2 text-sm font-semibold mx-auto">
                         {quote.buy.toFixed(2)}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <div className="text-xs text-muted-foreground">
                         {quote.rangeLow.toFixed(2)} - {quote.rangeHigh.toFixed(2)}
                       </div>
-                      <div className="mt-2 h-2 w-32 rounded-full bg-muted">
+                      <div className="mt-2 h-2 w-32 rounded-full bg-muted mx-auto">
                         <div
                           className="h-2 rounded-full bg-foreground"
                           style={{ width: `${quote.rangePosition}%` }}
@@ -210,7 +244,7 @@ export default function Watchlist() {
             </TableBody>
           </Table>
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card text-center h-[calc(100vh-22rem)]">
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-card text-center h-[calc(100vh-22rem)]">
             <img src="/price-timeseries.svg" alt="Price timeseries" className="h-60 w-60 pb-2" />
             <h2 className="mt-6 text-xl font-semibold">Your watchlist is empty</h2>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
