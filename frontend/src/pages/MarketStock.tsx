@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Info, Minus, Plus, Search, X } from "lucide-react";
+import { Minus, Plus, Search, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import StockSearchBar from "../components/ui/StockSearchBar";
 import StockChart from "../components/ui/Chart";
@@ -411,7 +411,7 @@ export default function MarketStock() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
-                  className={`rounded-full px-4 py-1 text-sm font-semibold transition-all duration-300 ${
+                  className={`rounded-lg px-4 py-1 text-sm font-semibold transition-all duration-300 ${
                     amountMode === "amount"
                       ? "bg-foreground text-background"
                       : "border border-border text-muted-foreground"
@@ -424,7 +424,7 @@ export default function MarketStock() {
                   Amount
                 </button>
                 <button
-                  className={`rounded-full px-4 py-1 text-sm font-semibold transition-all duration-300 ${
+                  className={`rounded-lg px-4 py-1 text-sm font-semibold transition-all duration-300 ${
                     amountMode === "shares"
                       ? "bg-foreground text-background"
                       : "border border-border text-muted-foreground"
@@ -485,7 +485,7 @@ export default function MarketStock() {
 
               <div className="flex items-center justify-between gap-2 ease-in-out duration-300">
                 <button
-                  className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${
                     orderType === "market"
                       ? "bg-foreground text-background"
                       : "border border-border text-muted-foreground"
@@ -495,7 +495,7 @@ export default function MarketStock() {
                   Market
                 </button>
                 <button
-                  className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${
                     orderType === "limit"
                       ? "bg-foreground text-background"
                       : "border border-border text-muted-foreground"
@@ -530,7 +530,7 @@ export default function MarketStock() {
             {tradeError ? <div className="mt-3 text-sm text-rose-500">{tradeError}</div> : null}
 
             <button
-              className="mt-6 w-full rounded-full bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-60"
+              className="mt-6 w-full rounded-lg bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-60"
               disabled={orderBusy || accountLoading}
               onClick={handlePlaceOrder}
             >
@@ -549,16 +549,7 @@ export default function MarketStock() {
           />
           <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl animate-modal-content">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">Set Price Alert</h2>
-                <button
-                  type="button"
-                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Info"
-                >
-                  <Info className="h-4 w-4" />
-                </button>
-              </div>
+              <h2 className="text-lg font-semibold">Set Price Alert</h2>
               <button
                 className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={closePriceAlertModal}
@@ -598,7 +589,7 @@ export default function MarketStock() {
               Current price – ${priceValue ? priceValue.toFixed(2) : "—"}
             </p>
             <button
-              className="mt-6 w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+              className="mt-6 w-full rounded-lg bg-black dark:bg-white px-4 py-3 text-sm font-semibold text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
               onClick={handleSetCustomAlert}
             >
               Set Alert
