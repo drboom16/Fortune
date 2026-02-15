@@ -1,5 +1,4 @@
 import { useSearchParams } from "react-router-dom";
-import StockSearchBar from "../components/ui/StockSearchBar";
 
 export default function SearchNoResults() {
   const [searchParams] = useSearchParams();
@@ -7,15 +6,7 @@ export default function SearchNoResults() {
 
   return (
     <div>
-      <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
-        <div className="flex h-24 items-center justify-between gap-6 px-8">
-          <div className="flex flex-1 items-center justify-center py-1">
-            <StockSearchBar className="max-w-lg" />
-          </div>
-        </div>
-      </header>
-
-      <div className="fixed inset-0 flex flex-col items-center justify-center pt-24 left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
+      <div className="fixed inset-0 flex flex-col items-center justify-center pt-28 left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
         <div className="flex flex-col items-center justify-center text-center px-8 max-w-xl">
           <img
             src="/stock-not-found.png"

@@ -4,7 +4,6 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { TableSkeleton } from "../components/ui/table-skeleton";
-import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
 import { apiFetch } from "../lib/api";
 
@@ -147,14 +146,6 @@ export default function PortfolioBreakdown() {
 
   return (
     <div>
-      <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
-        <div className="flex h-24 items-center justify-between gap-6 px-8">
-          <div className="flex flex-1 items-center justify-center py-1">
-            <StockSearchBar className="max-w-lg"/>
-          </div>
-        </div>
-      </header>
-
       <section className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-3">
               <Button className="text-2xl font-semibold bg-white text-black hover:bg-white/80" onClick={() => navigate("/portfolio/overview")}>

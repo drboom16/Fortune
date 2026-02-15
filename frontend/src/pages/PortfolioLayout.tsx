@@ -13,7 +13,7 @@ interface Position {
   net_value: number;
 }
 
-export default function PortfolioOverview() {
+export default function PortfolioLayout() {
   const [loading, setLoading] = useState(false);
   const [positionsPayload, setPositionsPayload] = useState<Position[] | null>(null);
   const [accountCash, setAccountCash] = useState<number | null>(null);
@@ -56,7 +56,7 @@ export default function PortfolioOverview() {
   }, []);
 
   return (
-    <div className="pt-24 pb-24">
+    <div className="pb-24">
       <Outlet context={{ loading, positionsPayload, accountCash, totalInvested, profitLoss, portfolioValue }} />
 
       {/* Bottom Section: Portfolio Value */}

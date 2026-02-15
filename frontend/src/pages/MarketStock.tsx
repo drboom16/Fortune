@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Minus, Plus, Search, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import StockSearchBar from "../components/ui/StockSearchBar";
 import StockChart from "../components/ui/Chart";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
 import { apiFetch } from "../lib/api";
@@ -346,14 +345,7 @@ export default function MarketStock() {
   const targetPrice = priceValue ? priceValue * (1 + customAlertPercent / 100) : 0;
 
   return (
-    <div className={`flex flex-col gap-6 ${loading || !data ? "pt-24" : "pt-48"}`}>
-      <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
-        <div className="flex h-24 items-center justify-between gap-6 px-8">
-          <div className="flex flex-1 items-center justify-center py-1">
-            <StockSearchBar className="max-w-lg"/>
-          </div>
-        </div>
-      </header>
+    <div className={`flex flex-col gap-6 ${loading || !data ? "pt-0" : "pt-24"}`}>
       {!loading && data && (
       <section className="fixed top-24 z-20 border-b border-border/40 bg-card/95 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
         <div className="flex items-center justify-between gap-6 px-8 py-4">

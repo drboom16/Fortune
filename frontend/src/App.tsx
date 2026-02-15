@@ -1,13 +1,13 @@
 import { useEffect, useState, useRef } from "react";
-import { Briefcase, Eye, Home, LogOut, PanelLeft } from "lucide-react";
+import { Briefcase, Calculator, Eye, LogOut, PanelLeft } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Button } from "./components/ui/button";
 import { ThemeToggle } from "./components/ui/theme-toggle";
+import StockSearchBar from "./components/ui/StockSearchBar";
 import { apiFetch } from "./lib/api";
 
-const navBase = "flex items-center rounded-xl py-4 text-left text-base font-medium";
-const navPad = (open: boolean) => (open ? "px-5" : "justify-center px-0");
+const navBase = "flex h-16 w-full min-h-16 items-center text-left text-base font-medium rounded-xl";
 
 const logout = async () => {
   try {
@@ -19,9 +19,17 @@ const logout = async () => {
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showContent, setShowContent] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
   const sidebarWidth = sidebarOpen ? "20rem" : "6rem";
+
+  useEffect(() => {
+    setShowContent(false);
+    setShowLogoutPopup(false);
+    const t = setTimeout(() => setShowContent(true), 300);
+    return () => clearTimeout(t);
+  }, [sidebarOpen]);
   const navigate = useNavigate();
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +73,7 @@ export default function App() {
           }`}
         >
           <div className="flex-1 flex flex-col">
-            {/* Header section */}
+            {/* Header section - Fortune title and toggle always visible */}
             <div className={`mb-10 flex flex-col gap-4 pt-5 ${sidebarOpen ? "px-8" : "px-5"}`}>
               <div className="flex items-center justify-between">
                 {sidebarOpen ? (
@@ -78,7 +86,10 @@ export default function App() {
                 <Button
                   variant="ghost"
                   className="h-14 w-14 rounded-xl"
-                  onClick={() => setSidebarOpen((open) => !open)}
+                  onClick={() => {
+                    setShowContent(false);
+                    setSidebarOpen((open) => !open);
+                  }}
                   aria-label="Toggle sidebar"
                 >
                   <PanelLeft className="h-7 w-7" />
@@ -86,44 +97,65 @@ export default function App() {
               </div>
             </div>
 
-            {/* Navigation links */}
-            <nav className={`flex flex-col gap-4 ${sidebarOpen ? "px-8" : "px-5"}`}>
-              <NavLink
-                to="/home"
-                className={({ isActive }: { isActive: boolean }) =>
-                  `${navBase} ${navPad(sidebarOpen)} ${
-                    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
-                  }`
-                }
-              >
-                {sidebarOpen ? <span>Home</span> : <Home className="h-7 w-7 shrink-0" />}
-              </NavLink>
-              <NavLink
-                to="/watchlist"
-                className={({ isActive }: { isActive: boolean }) =>
-                  `${navBase} ${navPad(sidebarOpen)} ${
-                    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
-                  }`
-                }
-              >
-                {sidebarOpen ? <span>Watchlist</span> : <Eye className="h-7 w-7 shrink-0" />}
-              </NavLink>
-              <NavLink
-                to="/portfolio/overview"
-                className={({ isActive }: { isActive: boolean }) =>
-                  `${navBase} ${navPad(sidebarOpen)} ${
-                    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
-                  }`
-                }
-              >
-                {sidebarOpen ? <span>Portfolio</span> : <Briefcase className="h-7 w-7 shrink-0" />}
-              </NavLink>
-            </nav>
+            {/* Navigation links - only render after sidebar reaches target width */}
+            {showContent && (
+              <nav className={`mt-3 flex w-full flex-col gap-2 self-stretch animate-sidebar-content-in ${sidebarOpen ? "px-6" : "px-3"}`}>
+                <NavLink
+                  to="/watchlist"
+                  className={({ isActive }: { isActive: boolean }) =>
+                    `${navBase} ${!sidebarOpen ? "justify-center" : ""} ${
+                      isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
+                    }`
+                  }
+                >
+                  {sidebarOpen ? (
+                    <span className="w-full whitespace-nowrap pl-6 pr-8">Watchlist</span>
+                  ) : (
+                    <span className="flex w-full justify-center">
+                      <Eye className="h-7 w-7 shrink-0" />
+                    </span>
+                  )}
+                </NavLink>
+                <NavLink
+                  to="/portfolio/overview"
+                  className={({ isActive }: { isActive: boolean }) =>
+                    `${navBase} ${!sidebarOpen ? "justify-center" : ""} ${
+                      isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
+                    }`
+                  }
+                >
+                  {sidebarOpen ? (
+                    <span className="w-full whitespace-nowrap pl-6 pr-8">Portfolio</span>
+                  ) : (
+                    <span className="flex w-full justify-center">
+                      <Briefcase className="h-7 w-7 shrink-0" />
+                    </span>
+                  )}
+                </NavLink>
+                <NavLink
+                  to="/portfolio/calculator"
+                  className={({ isActive }: { isActive: boolean }) =>
+                    `${navBase} ${!sidebarOpen ? "justify-center" : ""} ${
+                      isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
+                    }`
+                  }
+                >
+                  {sidebarOpen ? (
+                    <span className="w-full whitespace-nowrap pl-6 pr-8">Investment Calculator</span>
+                  ) : (
+                    <span className="flex w-full justify-center">
+                      <Calculator className="h-7 w-7 shrink-0" />
+                    </span>
+                  )}
+                </NavLink>
+              </nav>
+            )}
           </div>
 
-          {/* Bottom Section: User Email or Logout Icon */}
+          {/* Bottom Section - only render after sidebar reaches target width */}
+          {showContent && (
           <div 
-            className={`mt-auto bg-card ${sidebarOpen ? "px-8" : "px-5"} pt-2 pb-3`}
+            className={`mt-auto bg-card animate-sidebar-content-in ${sidebarOpen ? "px-8" : "px-5"} pt-2 pb-3`}
             ref={popupRef}
           >
             {sidebarOpen && userEmail ? (
@@ -160,12 +192,25 @@ export default function App() {
                   </div>
                 )}
               </div>
-            ) : null} 
+            ) : null}
+            {sidebarOpen && (
+              <p className="text-[10px] text-muted-foreground/80 px-1 pt-2 leading-tight">
+                All financial data is derived from Yahoo Finance.
+              </p>
+            )}
           </div>
+          )}
         </aside>
 
+        <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
+          <div className="flex items-center justify-between gap-6 px-8 py-6">
+            <div className="flex flex-1 items-center justify-center">
+              <StockSearchBar className="max-w-lg" />
+            </div>
+          </div>
+        </header>
         <div
-          className="h-full overflow-y-auto px-8 py-8"
+          className="h-full overflow-y-auto px-8 pt-36 pb-8"
           style={{ marginLeft: sidebarWidth, transition: "margin-left 300ms ease" }}
         >
           <Outlet />
