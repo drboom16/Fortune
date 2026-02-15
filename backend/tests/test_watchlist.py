@@ -14,7 +14,7 @@ def _fake_watchlist(symbols=None, limit=20):
 
 def test_watchlist_requires_auth(client):
     response = client.get("/api/market/watchlist")
-    assert response.status_code in {401, 422}
+    assert response.status_code == 401
 
 
 def test_watchlist_add_remove(client, monkeypatch):

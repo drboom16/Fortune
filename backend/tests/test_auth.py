@@ -50,7 +50,7 @@ def test_logout_revokes_tokens_and_blocks_further_use(app, client):
         revoked = RevokedToken.query.all()
         assert len(revoked) >= 1  # At least access or refresh token
 
-    # /auth/me fails with revoked token (401)
+    # /auth/me fails with revoked token
     me_after = client.get("/api/auth/me")
     assert me_after.status_code == 401
 

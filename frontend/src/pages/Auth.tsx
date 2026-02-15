@@ -42,7 +42,7 @@ export default function Auth() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-cover bg-center px-6 py-10"
+      className="light flex min-h-screen items-center justify-center bg-cover bg-center px-6 py-10"
       style={{ backgroundImage: "url(/login-background.jpg)" }}
     >
       <Card className="w-full max-w-md">

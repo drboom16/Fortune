@@ -6,6 +6,7 @@ import { Button } from "./components/ui/button";
 import { ThemeToggle } from "./components/ui/theme-toggle";
 import StockSearchBar from "./components/ui/StockSearchBar";
 import { apiFetch } from "./lib/api";
+import Auth from "./pages/Auth";
 
 const navBase = "flex h-16 w-full min-h-16 items-center text-left text-base font-medium rounded-xl";
 
@@ -22,7 +23,10 @@ export default function App() {
   const [showContent, setShowContent] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showLogoutPopup, setShowLogoutPopup] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const sidebarWidth = sidebarOpen ? "20rem" : "6rem";
+  const navigate = useNavigate();
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setShowContent(false);
@@ -30,15 +34,24 @@ export default function App() {
     const t = setTimeout(() => setShowContent(true), 300);
     return () => clearTimeout(t);
   }, [sidebarOpen]);
-  const navigate = useNavigate();
-  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     apiFetch("/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => data?.user?.email && setUserEmail(data.user.email))
-      .catch(() => {});
-  }, []);
+      .then((r) => {
+        if (!r.ok) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (data?.user?.email) setUserEmail(data.user.email);
+        setAuthChecked(true);
+      })
+      .catch(() => {
+        navigate("/login", { replace: true });
+      });
+  }, [navigate]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -57,6 +70,10 @@ export default function App() {
     await logout();
     navigate("/login");
   };
+
+  if (!authChecked) {
+    return <Auth />;
+  }
 
   return (
     <div
