@@ -1,7 +1,7 @@
 import asyncio
 import threading
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Set, Dict, Optional
 
 # Singleton pattern for the app instances' websocket connection
@@ -36,7 +36,7 @@ class WebSocketPriceManager:
 
         if symbol and price:
             self.price_cache[symbol] = float(price)
-            self.last_update[symbol] = datetime.utcnow()
+            self.last_update[symbol] = datetime.now(timezone.utc)
             print(f"Updated price for {symbol}: ${price:.2f}")
 
     async def _run_websocket(self):

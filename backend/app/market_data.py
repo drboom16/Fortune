@@ -160,7 +160,7 @@ def fetch_quote(symbol: str) -> dict:
 def fetch_chart(symbol: str, range_value: str) -> dict:
     if os.environ.get("MARKET_DATA_MOCK", "false").lower() == "true":
         points = []
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         days = 22 if range_value.upper() == "1M" else 5
         for index in range(days):
             date_value = today - timedelta(days=days - index)
