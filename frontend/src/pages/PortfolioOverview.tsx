@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { TableSkeleton } from "../components/ui/table-skeleton";
-import StockSearchBar from "../components/ui/StockSearchBar";
 import { Button } from "../components/ui/button";
 import { apiFetch } from "../lib/api";
 
@@ -104,14 +103,6 @@ export default function PortfolioOverview() {
 
   return (
     <div>
-      <header className="fixed top-0 z-30 border-b border-border/40 bg-card/90 backdrop-blur left-[var(--sidebar-width)] right-0 transition-[left] duration-300 ease-in-out">
-        <div className="flex h-24 items-center justify-between gap-6 px-8">
-          <div className="flex flex-1 items-center justify-center py-1">
-            <StockSearchBar className="max-w-lg"/>
-          </div>
-        </div>
-      </header>
-
       <section className="flex flex-col gap-4">
             <h1 className="text-2xl font-semibold">My Portfolio</h1>
             <div className="flex items-center gap-2">
@@ -119,7 +110,7 @@ export default function PortfolioOverview() {
                 variant={viewMode === "positions" ? "default" : "secondary"}
                 size="sm"
                 onClick={() => setViewMode("positions")}
-                className={viewMode === "positions" ? "bg-black text-white hover:bg-black/90" : ""}
+                className={viewMode === "positions" ? "bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90" : ""}
               >
                 All positions
               </Button>
@@ -127,7 +118,7 @@ export default function PortfolioOverview() {
                 variant={viewMode === "pending" ? "default" : "secondary"}
                 size="sm"
                 onClick={() => setViewMode("pending")}
-                className={viewMode === "pending" ? "bg-black text-white hover:bg-black/90" : ""}
+                className={viewMode === "pending" ? "bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90" : ""}
               >
                 Pending orders
               </Button>

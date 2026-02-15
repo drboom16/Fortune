@@ -32,7 +32,7 @@ export default function Auth() {
       }
       const payload = (await response.json()) as AuthResponse;
       setMessage(`Signed in as ${payload.user.email}`);
-      navigate("/home");
+      navigate("/portfolio/calculator");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Unable to authenticate.");
     } finally {

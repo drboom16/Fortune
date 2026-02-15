@@ -1,6 +1,6 @@
 from decimal import Decimal
 import yfinance as yf
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
@@ -563,13 +563,20 @@ def market_status():
 
 @api.get("/chart/<symbol>")
 def get_chart(symbol):
-    """Get historical price data for charting"""
-    period = request.args.get('period', '1mo') 
-    interval = request.args.get('interval', '1d') 
-    
+    """Get historical price data for charting. Supports period/interval or start/end date range."""
+    period = request.args.get('period', '1mo')
+    interval = request.args.get('interval', '1d')
+    start = request.args.get('start')
+    end = request.args.get('end')
+
     try:
         ticker = yf.Ticker(symbol)
-        hist = ticker.history(period=period, interval=interval)
+        if start:
+            # Custom date range: use start/end, default end to today
+            end_date = end if end else str(date.today())
+            hist = ticker.history(start=start, end=end_date, interval=interval or '1d')
+        else:
+            hist = ticker.history(period=period, interval=interval)
         
         chart_data = []
         for timestamp, row in hist.iterrows():
