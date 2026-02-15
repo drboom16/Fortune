@@ -7,14 +7,14 @@ import threading
 
 from .extensions import bcrypt, cors, db, jwt
 from .routes import api
-from .models import Position
+from .models import Position, RevokedToken
 from .websocket_manager import ws_manager
 from .scheduler import init_scheduler
 
 # NOTE: if you want to utilise an asynchronous background manager within Flask
 # you need to wrap the execution in a separate thread
 
-def create_app(config=None):  # ← Add config parameter
+def create_app(config=None):  
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
         "DATABASE_URL", "sqlite:///paper_trader.db"
@@ -48,6 +48,14 @@ def create_app(config=None):  # ← Add config parameter
     db.init_app(app)
     jwt.init_app(app)
     bcrypt.init_app(app)
+
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        jti = jwt_payload.get("jti")
+        if not jti:
+            return False
+        return RevokedToken.query.filter_by(jti=jti).first() is not None
+
     cors.init_app(
         app,
         resources={

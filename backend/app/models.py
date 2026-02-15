@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .extensions import db
 
@@ -9,7 +9,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     account = db.relationship("Account", back_populates="user", uselist=False)
     watchlist_items = db.relationship(
@@ -27,7 +27,7 @@ class Account(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     starting_balance = db.Column(db.Numeric(14, 2), nullable=False)
     cash_balance = db.Column(db.Numeric(14, 2), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = db.relationship("User", back_populates="account")
     positions = db.relationship("Position", back_populates="account", lazy="dynamic")
@@ -63,7 +63,7 @@ class Order(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Numeric(14, 4), nullable=False)
     status = db.Column(db.String(16), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     stop_loss_price = db.Column(db.Numeric(10, 4), nullable=True) # Optional
     take_profit_price = db.Column(db.Numeric(10, 4), nullable=True) # Optional
     exchange = db.Column(db.String(16), nullable=True) # Optional
@@ -96,9 +96,22 @@ class WatchlistItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     symbol = db.Column(db.String(16), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = db.relationship("User", back_populates="watchlist_items")
+
+
+class RevokedToken(db.Model):
+    """Stores revoked JWT IDs (access + refresh) for logout. Persists across restarts."""
+    __tablename__ = "revoked_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    jti = db.Column(db.String(36), unique=True, nullable=False, index=True)
+    revoked_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    def __repr__(self):
+        return f"<RevokedToken jti={self.jti}>"
 
 
 class PriceAlert(db.Model):
@@ -110,6 +123,6 @@ class PriceAlert(db.Model):
     base_price = db.Column(db.Numeric(14, 4), nullable=False)
     threshold_percent = db.Column(db.Numeric(8, 4), nullable=False)  # e.g. -10, +5
     triggered = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = db.relationship("User", backref=db.backref("price_alerts", lazy="dynamic"))

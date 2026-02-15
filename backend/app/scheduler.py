@@ -1,4 +1,8 @@
+from datetime import datetime, timezone
+
 from flask_apscheduler import APScheduler
+from app.extensions import db
+from app.models import RevokedToken
 from app.order_processor import process_pending_orders
 from app.price_alert_processor import process_price_alerts
 
@@ -9,7 +13,18 @@ def init_scheduler(app):
     """Initialize scheduler with Flask app"""
     scheduler.init_app(app)
     scheduler.start()
-    
+
+    @scheduler.task('interval', id='prune_revoked_tokens', hours=24)
+    def prune_revoked_tokens():
+        """Remove expired revoked tokens to keep table small"""
+        with scheduler.app.app_context():
+            deleted = db.session.query(RevokedToken).filter(
+                RevokedToken.expires_at < datetime.now(timezone.utc)
+            ).delete()
+            db.session.commit()
+            if deleted:
+                print(f"Pruned {deleted} expired revoked token(s)")
+
     @scheduler.task('interval', id='process_pending_orders', minutes=1)
     def scheduled_job():
         """This automatically runs with app context"""

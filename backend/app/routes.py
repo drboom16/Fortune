@@ -1,6 +1,6 @@
 from decimal import Decimal
 import yfinance as yf
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
@@ -25,12 +25,11 @@ from .market_data import (
     is_market_open,
     search_stocks,
 )
-from .models import Account, Order, Position, PriceAlert, User, WatchlistItem
+from .models import Account, Order, Position, PriceAlert, RevokedToken, User, WatchlistItem
 from .websocket_manager import ws_manager
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
-blacklisted_tokens = set() # In memory token blacklist
 
 def _normalize_watchlist_symbol(symbol: str) -> str:
     return symbol.strip().upper()
@@ -149,16 +148,36 @@ def refresh():
     return response, 200
 
 
+def _revoke_token_jti(jti, exp):
+    """Add token JTI to revoked_tokens table."""
+    if not jti:
+        return
+    expires_at = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else datetime.now(timezone.utc)
+    if RevokedToken.query.filter_by(jti=jti).first() is None:
+        db.session.add(RevokedToken(jti=jti, expires_at=expires_at))
+        db.session.commit()
+
+
 @api.post("/auth/logout")
 def logout():
     from flask_jwt_extended import get_jwt, verify_jwt_in_request
+
+    # Revoke access token
     try:
         verify_jwt_in_request(optional=True)
-        jti = get_jwt().get("jti")
-        if jti:
-            blacklisted_tokens.add(jti)
+        decoded = get_jwt()
+        _revoke_token_jti(decoded.get("jti"), decoded.get("exp"))
     except Exception:
         pass
+
+    # Revoke refresh token
+    try:
+        verify_jwt_in_request(optional=True, refresh=True)
+        decoded = get_jwt()
+        _revoke_token_jti(decoded.get("jti"), decoded.get("exp"))
+    except Exception:
+        pass
+
     response = jsonify({"message": "Successfully logged out"})
     unset_jwt_cookies(response)
     return response, 200
