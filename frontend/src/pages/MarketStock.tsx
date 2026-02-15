@@ -4,13 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import StockChart from "../components/ui/Chart";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
 import { apiFetch } from "../lib/api";
-import {
-  MOCK_AAPL_DATA,
-  MOCK_AAPL_CHART_DATA,
-  MOCK_AAPL_CHART_DATA_BY_PERIOD,
-  type AiCompanyPayload,
-  type ChartData,
-} from "../data/Mockdata";
+import type { AiCompanyPayload, ChartData } from "../data/Mockdata";
 
 const formatNum = (v: unknown): string => {
   if (v == null) return "—";
@@ -71,13 +65,6 @@ export default function MarketStock() {
 
   const loadChartData = async (period: string) => {
     if (!normalizedSymbol) return;
-    
-    if (normalizedSymbol === "AAPL") {
-      // Use period-specific mock data
-      const mockData = MOCK_AAPL_CHART_DATA_BY_PERIOD[period as keyof typeof MOCK_AAPL_CHART_DATA_BY_PERIOD];
-      setChartData(mockData || MOCK_AAPL_CHART_DATA);
-      return;
-    }
 
     try {
       const periodMap: Record<string, { period: string; interval: string }> = {
@@ -107,16 +94,6 @@ export default function MarketStock() {
     if (!normalizedSymbol) {
       setError("No symbol provided.");
       return;
-    }
-    if (normalizedSymbol === "AAPL") {
-      setLoading(true);
-      setError(null);
-      const timeout = setTimeout(() => {
-        setData(MOCK_AAPL_DATA);
-        setChartData(MOCK_AAPL_CHART_DATA);
-        setLoading(false);
-      }, 500);
-      return () => clearTimeout(timeout);
     }
     const load = async () => {
       setLoading(true);
