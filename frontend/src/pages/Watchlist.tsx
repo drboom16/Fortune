@@ -239,7 +239,7 @@ export default function Watchlist() {
             <img src="/price-timeseries.svg" alt="Price timeseries" className="h-60 w-60 pb-2" />
             <h2 className="mt-6 text-xl font-semibold">Your watchlist is empty</h2>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              Add stocks to your watchlist to see their price timeseries and get alerts when they move.
+              Add stocks to your watchlist to see their price timeseries.
             </p>
           </div>
         )}

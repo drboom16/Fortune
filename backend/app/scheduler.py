@@ -4,7 +4,7 @@ from flask_apscheduler import APScheduler
 from app.extensions import db
 from app.models import RevokedToken
 from app.order_processor import process_pending_orders
-from app.price_alert_processor import process_price_alerts
+# from app.price_alert_processor import process_price_alerts  # Price alerts disabled
 
 scheduler = APScheduler()
 
@@ -32,10 +32,11 @@ def init_scheduler(app):
             count = process_pending_orders()
             print(f"Processed {count} pending orders")
     
-    @scheduler.task('interval', id='process_price_alerts', minutes=2)
-    def price_alert_job():
-        """Check price alerts every 2 minutes and send emails when thresholds are reached"""
-        with scheduler.app.app_context():
-            count = process_price_alerts()
-            if count > 0:
-                print(f"Triggered {count} price alert(s)")
+    # Price alerts disabled
+    # @scheduler.task('interval', id='process_price_alerts', minutes=2)
+    # def price_alert_job():
+    #     """Check price alerts every 2 minutes and send emails when thresholds are reached"""
+    #     with scheduler.app.app_context():
+    #         count = process_price_alerts()
+    #         if count > 0:
+    #             print(f"Triggered {count} price alert(s)")
