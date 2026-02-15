@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask
+from flask import Flask, jsonify
 
 import asyncio
 import threading
@@ -55,6 +55,22 @@ def create_app(config=None):
         if not jti:
             return False
         return RevokedToken.query.filter_by(jti=jti).first() is not None
+
+    @jwt.unauthorized_loader
+    def unauthorized_callback(_reason):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    @jwt.invalid_token_loader
+    def invalid_token_callback(_reason):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    @jwt.expired_token_loader
+    def expired_token_callback(_header, _payload):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    @jwt.revoked_token_loader
+    def revoked_token_callback(_header, _payload):
+        return jsonify({"error": "Unauthorized"}), 401
 
     cors.init_app(
         app,
