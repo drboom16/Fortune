@@ -1,8 +1,24 @@
 # Fortune
 
-Web-based paper trading app with a Flask API and a Vite + React (shadcn/ui) frontend.
+Paper trading app for stocks, portfolios, and price alerts. Flask API + React frontend.
 
-## Backend setup (Flask)
+## Local Development
+
+### 1. Database
+
+**Option A – SQLite (simplest):** No setup. Omit `DATABASE_URL` in `backend/.env` and the app uses SQLite.
+
+**Option B – PostgreSQL via Docker:**
+```bash
+docker compose up -d
+```
+
+Then set `DATABASE_URL` in `backend/.env`:
+```
+DATABASE_URL=postgresql://fortune_user:fortune_password@localhost:5432/fortune
+```
+
+### 2. Backend
 
 ```bash
 cd backend
@@ -12,19 +28,9 @@ pip3 install -r requirements.txt
 python3 run.py
 ```
 
-The API runs at `http://localhost:5000/api`.
+API runs at `http://localhost:5000/api`.
 
-## Database setup (PostgreSQL via Docker)
-
-```bash
-cd ..
-docker compose up -d
-```
-
-This starts Postgres on `localhost:5432` with credentials from `docker-compose.yml`.
-Update `backend/.env` if you want to change the DB name/user/password.
-
-## Frontend setup (Vite + React)
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -32,10 +38,18 @@ npm install
 npm run dev
 ```
 
-The frontend runs at `http://localhost:3000` and reads `VITE_API_BASE_URL` from `frontend/.env`.
+Frontend runs at `http://localhost:3000`. The Vite proxy forwards `/api` to the backend.
 
-## Notes
+## Environment
 
-- Auth is JWT-based. After login, the token is stored in local storage.
-- Market data uses yfinance by default. Set `MARKET_DATA_MOCK=true` in `backend/.env` to use mocked data.
-- SQLite is the default for local dev. Update `DATABASE_URL` for real integrations.
+Create `backend/.env` with:
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `FLASK_ENV` | No | Set to `development` for local |
+| `DATABASE_URL` | No | Omit for SQLite; set for Postgres |
+| `JWT_SECRET_KEY` | No | Defaults to `change-me` |
+| `MARKET_DATA_MOCK` | No | Set to `true` for mocked data |
+| `RESEND_API_KEY` | No | Only for price alert emails |
+
+No `frontend/.env` needed; the app uses the Vite proxy by default.
