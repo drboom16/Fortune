@@ -1,4 +1,5 @@
 .DS_Store
+DEPLOYMENT.md
 .env
 .env.local
 .env.*.local
