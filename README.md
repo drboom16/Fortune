@@ -1,6 +1,6 @@
 # Fortune
 
-Paper trading app for stocks, portfolios, and price alerts. Flask API + React frontend.
+Paper trading app for stocks and portfolios. Flask API + React frontend.
 
 ## Local Development
 
@@ -42,14 +42,4 @@ Frontend runs at `http://localhost:3000`. The Vite proxy forwards `/api` to the 
 
 ## Environment
 
-Create `backend/.env` with:
-
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `FLASK_ENV` | No | Set to `development` for local |
-| `DATABASE_URL` | No | Omit for SQLite; set for Postgres |
-| `JWT_SECRET_KEY` | No | Defaults to `change-me` |
-| `MARKET_DATA_MOCK` | No | Set to `true` for mocked data |
-| `RESEND_API_KEY` | No | Only for price alert emails |
-
-No `frontend/.env` needed; the app uses the Vite proxy by default.
+Create `backend/.env` only if using PostgreSQL; set `DATABASE_URL` as shown in Database above. No `frontend/.env` needed.
