@@ -25,7 +25,7 @@ from .market_data import (
     is_market_open,
     search_stocks,
 )
-from .models import Account, Order, Position, PriceAlert, RevokedToken, User, WatchlistItem
+from .models import Account, Order, Position, RevokedToken, User, WatchlistItem  # PriceAlert commented out
 from .websocket_manager import ws_manager
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -320,33 +320,34 @@ def stock_metric():
         return jsonify({"error": "Symbol required"}), 400
     return jsonify(fetch_basic_financials(symbol, metric))
 
-@api.post("/price-alerts")
-@jwt_required()
-def create_price_alert():
-    payload = request.get_json() or {}
-    symbol = _normalize_watchlist_symbol(payload.get("symbol", ""))
-    threshold_percent = payload.get("threshold_percent")
-    if not symbol:
-        return jsonify({"error": "Symbol required"}), 400
-    if threshold_percent is None:
-        return jsonify({"error": "threshold_percent required"}), 400
-    try:
-        threshold_percent = Decimal(str(threshold_percent))
-    except (TypeError, ValueError):
-        return jsonify({"error": "Invalid threshold_percent"}), 400
-    current_price = get_current_price(symbol)
-    if current_price <= 0:
-        return jsonify({"error": "Could not fetch current price"}), 400
-    user_id = int(get_jwt_identity())
-    alert = PriceAlert(
-        user_id=user_id,
-        symbol=symbol,
-        base_price=Decimal(str(current_price)),
-        threshold_percent=threshold_percent,
-    )
-    db.session.add(alert)
-    db.session.commit()
-    return jsonify({"alert": {"id": alert.id, "symbol": symbol, "base_price": float(alert.base_price), "threshold_percent": float(threshold_percent)}}), 201
+# Price alerts disabled
+# @api.post("/price-alerts")
+# @jwt_required()
+# def create_price_alert():
+#     payload = request.get_json() or {}
+#     symbol = _normalize_watchlist_symbol(payload.get("symbol", ""))
+#     threshold_percent = payload.get("threshold_percent")
+#     if not symbol:
+#         return jsonify({"error": "Symbol required"}), 400
+#     if threshold_percent is None:
+#         return jsonify({"error": "threshold_percent required"}), 400
+#     try:
+#         threshold_percent = Decimal(str(threshold_percent))
+#     except (TypeError, ValueError):
+#         return jsonify({"error": "Invalid threshold_percent"}), 400
+#     current_price = get_current_price(symbol)
+#     if current_price <= 0:
+#         return jsonify({"error": "Could not fetch current price"}), 400
+#     user_id = int(get_jwt_identity())
+#     alert = PriceAlert(
+#         user_id=user_id,
+#         symbol=symbol,
+#         base_price=Decimal(str(current_price)),
+#         threshold_percent=threshold_percent,
+#     )
+#     db.session.add(alert)
+#     db.session.commit()
+#     return jsonify({"alert": {"id": alert.id, "symbol": symbol, "base_price": float(alert.base_price), "threshold_percent": float(threshold_percent)}}), 201
 
 
 @api.get("/forex/symbol")

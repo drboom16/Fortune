@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus, Search, X } from "lucide-react";
+import { Search } from "lucide-react";  // Minus, Plus, X removed (price alerts disabled)
 import { useNavigate, useParams } from "react-router-dom";
 import StockChart from "../components/ui/Chart";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
@@ -49,8 +49,9 @@ export default function MarketStock() {
   const [orderBusy, setOrderBusy] = useState(false);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [chartPeriod, setChartPeriod] = useState("1mo");
-  const [priceAlertModalOpen, setPriceAlertModalOpen] = useState(false);
-  const [customAlertPercent, setCustomAlertPercent] = useState(3.5);
+  // Price alerts disabled
+  // const [priceAlertModalOpen, setPriceAlertModalOpen] = useState(false);
+  // const [customAlertPercent, setCustomAlertPercent] = useState(3.5);
 
   const normalizedSymbol = (symbol ?? "").trim().toUpperCase();
 
@@ -293,33 +294,31 @@ export default function MarketStock() {
     }
   };
 
-  const handlePriceAlertClick = async (thresholdPercent: number) => {
-    if (!normalizedSymbol) return;
-    try {
-      const res = await apiFetch("/price-alerts", {
-        method: "POST",
-        body: { symbol: normalizedSymbol, threshold_percent: thresholdPercent },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.alert) {
-          console.log("[Price Alert] Email will be sent when threshold is reached:", data.alert);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to create price alert:", err);
-    }
-  };
-
-  const openPriceAlertModal = () => setPriceAlertModalOpen(true);
-  const closePriceAlertModal = () => setPriceAlertModalOpen(false);
-
-  const handleSetCustomAlert = async () => {
-    await handlePriceAlertClick(customAlertPercent);
-    closePriceAlertModal();
-  };
-
-  const targetPrice = priceValue ? priceValue * (1 + customAlertPercent / 100) : 0;
+  // Price alerts disabled
+  // const handlePriceAlertClick = async (thresholdPercent: number) => {
+  //   if (!normalizedSymbol) return;
+  //   try {
+  //     const res = await apiFetch("/price-alerts", {
+  //       method: "POST",
+  //       body: { symbol: normalizedSymbol, threshold_percent: thresholdPercent },
+  //     });
+  //     if (res.ok) {
+  //       const data = await res.json();
+  //       if (data.alert) {
+  //         console.log("[Price Alert] Email will be sent when threshold is reached:", data.alert);
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to create price alert:", err);
+  //   }
+  // };
+  // const openPriceAlertModal = () => setPriceAlertModalOpen(true);
+  // const closePriceAlertModal = () => setPriceAlertModalOpen(false);
+  // const handleSetCustomAlert = async () => {
+  //   await handlePriceAlertClick(customAlertPercent);
+  //   closePriceAlertModal();
+  // };
+  // const targetPrice = priceValue ? priceValue * (1 + customAlertPercent / 100) : 0;
 
   return (
     <div className={`flex flex-col gap-6 ${loading || !data ? "pt-0" : "pt-24"}`}>
@@ -509,63 +508,13 @@ export default function MarketStock() {
         </div>
       ) : null}
 
+      {/* Price alerts disabled
       {priceAlertModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-modal-backdrop"
-            onClick={closePriceAlertModal}
-            role="presentation"
-          />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl animate-modal-content">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Set Price Alert</h2>
-              <button
-                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                onClick={closePriceAlertModal}
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mt-6 text-center text-base font-semibold">
-              Notify me when {normalizedSymbol} moves
-            </p>
-            <div className="mt-6 flex w-full items-center justify-between">
-              <button
-                type="button"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 hover:bg-muted"
-                onClick={() => setCustomAlertPercent((p) => Math.max(-50, p - 0.5))}
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <div className="flex flex-1 items-center justify-center">
-                <span className="text-2xl font-semibold tabular-nums">
-                  {customAlertPercent >= 0 ? "+" : ""}{customAlertPercent}%
-                </span>
-              </div>
-              <button
-                type="button"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 hover:bg-muted"
-                onClick={() => setCustomAlertPercent((p) => Math.min(50, p + 0.5))}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mt-3 text-center text-sm text-muted-foreground">
-              Price: ${targetPrice.toFixed(4)}
-            </p>
-            <p className="mt-1 text-center text-sm text-muted-foreground">
-              Current price – ${priceValue ? priceValue.toFixed(2) : "—"}
-            </p>
-            <button
-              className="mt-6 w-full rounded-lg bg-black dark:bg-white px-4 py-3 text-sm font-semibold text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
-              onClick={handleSetCustomAlert}
-            >
-              Set Alert
-            </button>
-          </div>
+          ...
         </div>
       ) : null}
+      */}
 
       {loading ? (
         <div className="flex min-h-[calc(100vh-12rem)] w-full flex-col items-center justify-center">
@@ -642,36 +591,14 @@ export default function MarketStock() {
                   </div>
                 </section>
 
+                {/* Price alerts disabled
                 <section className="flex flex-col gap-4">
                   <div className="rounded-2xl border border-border bg-card p-6">
                     <h2 className="text-lg font-semibold">Price Alert</h2>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Price alerts notify you when the asset hits a target you set.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {[
-                        { label: "-10%", value: -10 },
-                        { label: "-5%", value: -5 },
-                        { label: "+5%", value: 5 },
-                        { label: "+10%", value: 10 },
-                      ].map(({ label, value }) => (
-                        <button
-                          key={label}
-                          className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
-                          onClick={() => handlePriceAlertClick(value)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                      <button
-                        className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
-                        onClick={openPriceAlertModal}
-                      >
-                        Custom
-                      </button>
-                    </div>
+                    ...
                   </div>
                 </section>
+                */}
 
                 <section className="flex flex-col gap-4">
                   <div className="rounded-2xl border border-border bg-card p-6">
