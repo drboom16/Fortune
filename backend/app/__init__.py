@@ -20,6 +20,12 @@ def create_app(config=None):
         "DATABASE_URL", "sqlite:///paper_trader.db"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Fail fast on DB connect (avoid hanging worker startup on Render)
+    db_url = app.config["SQLALCHEMY_DATABASE_URI"]
+    if db_url.startswith("postgresql"):
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {"connect_timeout": 10},
+        }
     app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "change-me")
 
     # JWT HTTPOnly cookie configuration (XSS-resistant, tokens never exposed to JS)
@@ -88,28 +94,22 @@ def create_app(config=None):
     def root():
         return jsonify({"status": "ok", "service": "fortune-api"}), 200
 
-    with app.app_context():
-        # Create all tables
-        db.create_all()
+    def _init_background():
+        """Defer heavy init so worker can accept connections quickly (avoids Render port scan timeout)."""
+        with app.app_context():
+            db.create_all()
+            symbols = db.session.query(Position.symbol).distinct().all()
+            symbol_list = [symbol[0] for symbol in symbols]
+            if symbol_list:
+                def run_ws_manager():
+                    asyncio.run(ws_manager.start(symbol_list))
+                t = threading.Thread(target=run_ws_manager, daemon=True)
+                t.start()
+                print(f"Started WebSocket for {len(symbol_list)} symbols: {symbol_list}")
+            if not app.config.get("TESTING", False):
+                init_scheduler(app)
 
-        # Get all unique symbols from the database
-        symbols = db.session.query(Position.symbol).distinct().all()
-        symbol_list = [symbol[0] for symbol in symbols]
- 
-        if symbol_list:
-            # Start WebSocket streaming for all symbols
-
-            def run_ws_manager():
-                asyncio.run(ws_manager.start(symbol_list))
-
-            # Run WebSocket streaming in background thread (daemon threads mean the thread dies when the main app closes)
-            thread = threading.Thread(target=run_ws_manager, daemon=True)
-            thread.start()
-
-            print(f"Started WebSocket for {len(symbol_list)} symbols: {symbol_list}")
-
-    # Only start scheduler if NOT in testing mode
-    if not app.config.get("TESTING", False):
-        init_scheduler(app)
+    t = threading.Thread(target=_init_background, daemon=True)
+    t.start()
 
     return app
