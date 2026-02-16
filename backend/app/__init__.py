@@ -84,6 +84,10 @@ def create_app(config=None):
 
     app.register_blueprint(api)
 
+    @app.route("/")
+    def root():
+        return jsonify({"status": "ok", "service": "fortune-api"}), 200
+
     with app.app_context():
         # Create all tables
         db.create_all()
