@@ -30,9 +30,11 @@ def create_app(config=None):
 
     # JWT HTTPOnly cookie configuration (XSS-resistant, tokens never exposed to JS)
     app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-    app.config["JWT_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production"
+    is_production = os.environ.get("FLASK_ENV") == "production"
+    app.config["JWT_COOKIE_SECURE"] = is_production
     app.config["JWT_COOKIE_HTTPONLY"] = True
-    app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+    # SameSite=None required when frontend and backend are on different origins (e.g. Render)
+    app.config["JWT_COOKIE_SAMESITE"] = "None" if is_production else "Lax"
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 15 * 60  # 15 minutes
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = 30 * 24 * 60 * 60  # 30 days
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False  # SameSite=Lax mitigates most CSRF
