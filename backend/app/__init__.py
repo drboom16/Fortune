@@ -96,6 +96,11 @@ def create_app(config=None):
     def root():
         return jsonify({"status": "ok", "service": "fortune-api"}), 200
 
+    @app.route("/ping")
+    def ping():
+        """Lightweight keep-alive for cron (e.g. cron-job.org). Returns minimal payload."""
+        return jsonify({"status": "ok"}), 200
+
     def _init_background():
         """Defer heavy init so worker can accept connections quickly (avoids Render port scan timeout)."""
         with app.app_context():
