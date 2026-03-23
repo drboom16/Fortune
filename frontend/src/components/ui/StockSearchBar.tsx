@@ -2,7 +2,8 @@ import { useState, FormEvent, useEffect, useRef } from "react";
 import { Search, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+import { apiFetch } from "../../lib/api";
+
 const SEARCH_CACHE_KEY = "fortune_search_history";
 const MAX_CACHED = 3;
 
@@ -88,7 +89,7 @@ export default function StockSearchBar({
     const trimmed = q.trim();
     if (!trimmed) return [];
     try {
-      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(trimmed)}`);
+      const res = await apiFetch(`/search?q=${encodeURIComponent(trimmed)}`);
       if (!res.ok) return [];
       const data = (await res.json()) as { results: SearchResult[] };
       return data.results ?? [];
