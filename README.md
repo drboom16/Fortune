@@ -1,6 +1,6 @@
 # Fortune
 
-Paper trading app for stocks and portfolios. Flask API + React frontend.
+Paper trading app for stocks and portfolios. Flask API + React frontend. See demo video [HERE](https://www.youtube.com/watch?v=zH18Zg7qXfo)
 
 ## Local Development
 
